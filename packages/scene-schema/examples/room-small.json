@@ -1,0 +1,43 @@
+{
+  "version": "0.1",
+  "scene": {
+    "preset": "room_small",
+    "size": [8, 3, 6]
+  },
+  "actors": [
+    {
+      "id": "A",
+      "label": "男主",
+      "color": "#e74c3c",
+      "start": [-2, 0, 1],
+      "facing": [1, 0, 0],
+      "pose": "stand",
+      "moves": [
+        {
+          "to": [1, 0, 0],
+          "t0": 1.0,
+          "t1": 3.0,
+          "pose": "walk"
+        }
+      ]
+    },
+    {
+      "id": "B",
+      "label": "女主",
+      "color": "#3498db",
+      "start": [2, 0, 0],
+      "facing": [-1, 0, 0],
+      "pose": "sit"
+    }
+  ],
+  "camera": {
+    "fov": 35,
+    "keyframes": [
+      { "t": 0, "pos": [0, 1.6, 6], "lookAt": "A" },
+      { "t": 4, "pos": [0, 1.5, 3], "lookAt": "B", "ease": "easeInOut" }
+    ]
+  },
+  "duration": 5,
+  "fps": 24,
+  "aspect": "2.39:1"
+}

@@ -1,0 +1,47 @@
+{
+  "name": "@director-stage/scene-schema",
+  "version": "0.1.0",
+  "description": "3D 导演台 · 场景 JSON Schema · v0.1 · 单一数据源 (SSOT)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./constants": {
+      "types": "./dist/constants.d.ts",
+      "import": "./dist/constants.js"
+    }
+  },
+  "files": [
+    "dist",
+    "examples"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --import tsx ./src/*.test.ts",
+    "clean": "node -e \"const fs=require('fs');if(fs.existsSync('dist'))fs.rmSync('dist',{recursive:true})\""
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "3d-director-stage",
+    "ai-video",
+    "video-generation",
+    "storyboard",
+    "json-schema",
+    "zod"
+  ]
+}

@@ -1,0 +1,54 @@
+# Dependencies (never commit · never upload)
+node_modules/
+**/node_modules/
+
+# Vite build outputs (uploaded from packages/*/dist · not in git)
+packages/*/dist/
+
+# Runtime cache
+*.log
+.DS_Store
+.cache/
+
+# Deployment secrets
+*.ppk
+*.pem
+*.key
+deploy-remote.ps1
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+
+# TypeScript
+*.tsbuildinfo
+
+# Test
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.bak
+--version
+编译*.txt
+
+# Local build helper scripts (one-off debug)
+debug-build.js
+run-vite-build.js
+# `build` empty file accidentally created earlier; `build/` covers any future build output dir
+build
+build/
+
+# Vite cache (regenerated)
+.vite/
+*.local
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Force-include dist/ if needed (uncomment to commit build output)
+# !packages/web/dist/
+# !packages/scene-schema/dist/

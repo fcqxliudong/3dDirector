@@ -1,0 +1,19 @@
+{
+  "version": "0.1",
+  "scene": {
+    "preset": "corridor",
+    "size": [4, 3, 20]
+  },
+  "actors": [],
+  "camera": {
+    "fov": 50,
+    "keyframes": [
+      { "t": 0, "pos": [0, 1.6, -8], "lookAt": [0, 1.5, 8] },
+      { "t": 6, "pos": [0, 1.5, 0], "lookAt": [0, 1.25, 8], "ease": "easeInOut" },
+      { "t": 10, "pos": [0, 1.4, 6], "lookAt": [0, 1.0, 10], "ease": "easeOut" }
+    ]
+  },
+  "duration": 10,
+  "fps": 24,
+  "aspect": "2.39:1"
+}

@@ -1,0 +1,344 @@
+这个思路非常精准，而且**目前市场上几乎没有人在做这个完整闭环**。
+
+Runway、Luma、可灵只做了"运镜滑杆"，Wonder Studio 只做"实拍替换"，**没有人做"AI 生成 3D 白模场景 → 导演在 Web 上调整 → 导出深度/法线序列 → 喂给视频模型"这条完整管线**。这是一个真正的产品空白。
+
+下面我把整个系统的架构、使用流程、技术选型和关键难点全部拆开讲。
+
+---
+
+## 一、整体产品架构
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Web 浏览器前端                         │
+│                                                         │
+│  ┌──────────┐   ┌──────────────┐   ┌────────────────┐   │
+│  │ 对话面板  │──▶│ AI 智能体层   │──▶│  3D 导演视口    │   │
+│  │ (意图输入) │   │ (LLM Agent)  │   │  (Three.js)    │   │
+│  └──────────┘   └──────┬───────┘   └───────┬────────┘   │
+│                        │                   │            │
+│              生成场景JSON+运镜         导演手动微调        │
+│                        │                   │            │
+│                        ▼                   ▼            │
+│              ┌─────────────────────────────────┐         │
+│              │     多通道渲染引擎 (WebGL)        │         │
+│              │  RGB │ Depth │ Normal │ Seg     │         │
+│              └─────────────┬───────────────────┘         │
+│                            │                            │
+│                     逐帧导出序列                          │
+└────────────────────────────┬────────────────────────────┘
+                             │ HTTP / WebSocket
+                             ▼
+┌─────────────────────────────────────────────────────────┐
+│                      后端服务                            │
+│                                                         │
+│  ┌──────────────┐    ┌──────────────────────────────┐   │
+│  │ 帧序列管理    │───▶│  AI 视频生成管线              │   │
+│  │ (存储/编码)   │    │  ComfyUI / Kling API /       │   │
+│  │              │    │  CameraCtrl / ControlNet      │   │
+│  └──────────────┘    └──────────────┬───────────────┘   │
+│                                     │                   │
+│                                     ▼                   │
+│                           最终 AI 视频输出               │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 二、完整使用流程（用户视角 Walkthrough）
+
+### Step 1：导演输入创意意图
+
+用户在左侧对话框输入自然语言：
+
+> *"一个废弃的太空站走廊，失重状态，镜头从走廊尽头缓慢推进到一扇打开的舱门前，冷蓝色调，有漂浮的碎片"*
+
+### Step 2：AI 智能体生成 3D 场景 + 运镜
+
+后台 LLM Agent 做三件事：
+
+**① 解析场景语义，生成 3D 布局 JSON：**
+```json
+{
+  "scene": {
+    "environment": "space_station_corridor",
+    "lighting": { "color": "#4488ff", "intensity": 0.6, "type": "ambient" },
+    "objects": [
+      { "type": "box", "name": "wall_left",  "size": [0.2, 3, 20], "pos": [-2, 1.5, 0] },
+      { "type": "box", "name": "wall_right", "size": [0.2, 3, 20], "pos": [2, 1.5, 0] },
+      { "type": "box", "name": "ceiling",    "size": [4, 0.2, 20], "pos": [0, 3, 0] },
+      { "type": "box", "name": "floor",      "size": [4, 0.2, 20], "pos": [0, 0, 0] },
+      { "type": "box", "name": "door_frame", "size": [1.5, 2.5, 0.3], "pos": [0, 1.25, 8] },
+      { "type": "sphere", "name": "debris_1", "size": [0.15], "pos": [-0.5, 2, 3], "float": true },
+      { "type": "sphere", "name": "debris_2", "size": [0.08], "pos": [0.8, 1.5, 5], "float": true }
+    ]
+  }
+}
+```
+
+**② 生成摄像机运镜路径：**
+```json
+{
+  "camera": {
+    "fov": 35,
+    "keyframes": [
+      { "time": 0,  "pos": [0, 1.6, -8], "lookAt": [0, 1.5, 8], "ease": "linear" },
+      { "time": 3,  "pos": [0, 1.6, -2], "lookAt": [0, 1.5, 8], "ease": "easeInOut" },
+      { "time": 6,  "pos": [0, 1.5, 5],  "lookAt": [0, 1.25, 8], "ease": "easeOut" }
+    ],
+    "duration": 6
+  }
+}
+```
+
+**③ 生成视频模型的提示词：**
+> *"Abandoned space station corridor, zero gravity, floating debris, cold blue lighting, cinematic slow push-in, sci-fi atmosphere, 4K"*
+
+### Step 3：导演在 3D 视口中调整
+
+Web 页面上出现一个完整的 3D 视口（类似简化版 Blender）：
+
+| 导演可以做的操作 | 交互方式 |
+| :--- | :--- |
+| **拖拽物体位置** | 选中物体 → 拖拽 Gizmo 箭头 |
+| **调整物体大小** | 拖拽缩放手柄 |
+| **修改摄像机路径** | 拖拽路径曲线上的关键帧控制点 |
+| **调整运镜速度** | 底部时间轴拖拽关键帧间距 |
+| **修改灯光** | 右侧面板调色温、强度、方向 |
+| **添加/删除物体** | 对话输入"加一个漂浮的宇航员头盔"，Agent 实时添加 |
+| **预览运镜** | 按空格键播放摄像机动画 |
+
+> **关键体验：** 导演看到的不是最终画面，而是**灰模/白模 + 彩色深度图**的预览。这已经足够判断构图、透视和运镜节奏。
+
+### Step 4：一键导出多通道参考序列
+
+点击"生成参考视频"按钮，WebGL 引擎逐帧渲染并导出：
+
+| 通道 | 用途 | 渲染方式 |
+| :--- | :--- | :--- |
+| **Depth Map** | 控制空间透视、前后景关系 | `MeshDepthMaterial` |
+| **Normal Map** | 控制表面光影方向 | `MeshNormalMaterial` |
+| **Segmentation** | 区分前景/背景/角色 | 按物体 ID 着色 |
+| **Camera JSON** | 精确摄像机内外参 | 每帧的 `matrixWorldInverse` + `projectionMatrix` |
+| **Preview RGB** | 给导演自己看的预览 | 标准渲染 |
+
+导出格式：
+- 帧序列 PNG（如 `depth_0001.png` ~ `depth_0144.png`，24fps × 6s）
+- 或直接编码为 MP4（深度图编码为灰度视频）
+- `camera_trajectory.json`
+
+### Step 5：喂给 AI 视频模型
+
+后端自动将参考序列送入生成管线：
+
+**方案 A：自建 ComfyUI 后端（最灵活）**
+```
+深度图序列 ──▶ ControlNet Depth ──┐
+法线图序列 ──▶ ControlNet Normal ─┤──▶ Wan2.1 / SVD ──▶ 最终视频
+摄像机 JSON ─▶ CameraCtrl ────────┘
+提示词 ──────▶ Text Encoder ──────┘
+```
+
+**方案 B：调用商业 API（最快上线）**
+```
+深度图 MP4 + 提示词 ──▶ Kling API (参考视频模式) ──▶ 最终视频
+深度图 MP4 + 提示词 ──▶ MiniMax 海螺 API ──▶ 最终视频
+```
+
+### Step 6：迭代
+
+导演看到生成结果后，回到 3D 视口：
+- "走廊太窄了" → 拉宽墙壁
+- "推进太快了" → 拉长关键帧间距
+- "碎片不够多" → 对话让 Agent 加碎片
+
+重新导出 → 重新生成，直到满意。
+
+---
+
+## 三、核心技术模块拆解
+
+### 模块 1：Web 3D 引擎（前端核心）
+
+**推荐技术栈：Three.js + React Three Fiber + Drei**
+
+```javascript
+// 核心：多通道渲染（深度图）
+const depthTarget = new WebGLRenderTarget(width, height);
+const depthMaterial = new MeshDepthMaterial({
+  depthPacking: THREE.RGBADepthPacking
+});
+
+// 渲染深度通道
+scene.overrideMaterial = depthMaterial;
+renderer.setRenderTarget(depthTarget);
+renderer.render(scene, camera);
+scene.overrideMaterial = null;
+
+// 渲染法线通道
+const normalMaterial = new MeshNormalMaterial();
+scene.overrideMaterial = normalMaterial;
+renderer.setRenderTarget(normalTarget);
+renderer.render(scene, camera);
+```
+
+**为什么选 Three.js 而不是 Babylon.js？**
+- React Three Fiber 生态极其成熟，UI 组件化开发效率高
+- `@react-three/drei` 自带 OrbitControls、TransformControls（拖拽 Gizmo）、Html 标注
+- 社区有大量现成的 Gizmo、Timeline、CurveEditor 组件
+
+### 模块 2：AI 智能体层（场景 + 运镜生成）
+
+**架构：LLM + Function Calling + 场景模板库**
+
+```python
+# 伪代码：Agent 生成场景
+system_prompt = """
+你是一个 3D 场景导演助手。根据用户的描述，生成场景布局 JSON。
+规则：
+1. 所有物体用基本几何体（box, sphere, cylinder, plane）表示
+2. 坐标系：Y 轴向上，单位：米
+3. 摄像机高度默认 1.6m（人眼高度）
+4. 运镜关键帧至少 2 个，最多 6 个
+5. 输出严格遵循以下 JSON Schema...
+"""
+
+# 运镜模板库（Agent 可调用）
+camera_presets = {
+    "push_in":      "从远到近推进，营造紧张感",
+    "pull_out":     "从近到远拉出，揭示环境",
+    "orbit":        "环绕主体 180°/360°",
+    "crane_up":     "从地面升起，上帝视角",
+    "tracking":     "跟随主体横向移动",
+    "dutch_angle":  "倾斜构图，不安感",
+    "static":       "固定机位",
+}
+```
+
+**关键优化：** 不要让 LLM 从零生成所有物体。预置场景模板（室内、街道、森林、太空），LLM 只负责**选择模板 + 调整参数 + 添加细节物体**。这样生成速度快、质量稳定。
+
+### 模块 3：运镜曲线编辑器
+
+```javascript
+// Three.js 中用 CatmullRomCurve3 做平滑摄像机路径
+const points = keyframes.map(kf => new THREE.Vector3(...kf.pos));
+const cameraPath = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.5);
+
+// 动画循环中
+function animate(time) {
+  const t = time / duration; // 0~1
+  const pos = cameraPath.getPointAt(t);
+  const lookAt = lookAtPath.getPointAt(t);
+  camera.position.copy(pos);
+  camera.lookAt(lookAt);
+}
+```
+
+**导演交互：** 在 3D 视口中显示一条彩色曲线（摄像机路径），导演可以直接拖拽曲线上的控制点来改变运镜。
+
+### 模块 4：帧序列导出
+
+```javascript
+// 逐帧渲染并导出
+async function exportSequence(totalFrames) {
+  const frames = [];
+  for (let i = 0; i < totalFrames; i++) {
+    const t = i / totalFrames;
+    updateCamera(t);
+    
+    // 渲染深度图
+    renderer.setRenderTarget(depthTarget);
+    scene.overrideMaterial = depthMaterial;
+    renderer.render(scene, camera);
+    
+    // 读取像素
+    const pixels = new Uint8Array(width * height * 4);
+    renderer.readRenderTargetPixels(depthTarget, 0, 0, width, height, pixels);
+    
+    // 转为 PNG Blob
+    const blob = await pixelsToPNG(pixels, width, height);
+    frames.push(blob);
+  }
+  
+  // 打包为 ZIP 或直接编码为 MP4（用 WebCodecs API）
+  return encodeToMP4(frames, 24);
+}
+```
+
+### 模块 5：与视频模型对接
+
+**最推荐的方案：ComfyUI API 后端**
+
+```python
+# ComfyUI 工作流（伪代码）
+workflow = {
+    "load_depth_sequence": { "frames": "depth_*.png" },
+    "load_normal_sequence": { "frames": "normal_*.png" },
+    "controlnet_depth": { 
+        "model": "control_v11f1p_sd15_depth",
+        "strength": 0.85 
+    },
+    "camera_ctrl": {
+        "trajectory": "camera_trajectory.json",
+        "model": "CameraCtrl_v1"
+    },
+    "video_model": {
+        "model": "Wan2.1-T2V-14B",  # 或 SVD / Kling
+        "prompt": user_prompt,
+        "frames": 72,
+        "fps": 24
+    }
+}
+```
+
+---
+
+## 四、MVP 最小可行产品建议
+
+不要一上来就做完整系统。**4 周 MVP 路线图：**
+
+| 周次 | 目标 | 交付物 |
+| :--- | :--- | :--- |
+| **Week 1** | 3D 视口 + 基础场景 | Three.js 白模场景，OrbitControls，几个几何体 |
+| **Week 2** | 运镜控制 + 深度图渲染 | 摄像机路径动画 + Depth/Normal 双通道实时预览 |
+| **Week 3** | AI Agent 接入 | 对话框输入 → GPT-4o 生成场景 JSON → 自动搭建 3D 场景 |
+| **Week 4** | 导出 + 对接视频模型 | 帧序列导出 → 调用 Kling API / ComfyUI → 返回最终视频 |
+
+**MVP 砍掉的功能：**
+- ❌ 复杂 3D 模型（只用几何体白模）
+- ❌ 角色动画（MVP 只做环境和运镜）
+- ❌ 多用户协作
+- ❌ 精细材质编辑
+
+---
+
+## 五、关键难点和解决方案
+
+| 难点 | 问题 | 解决方案 |
+| :--- | :--- | :--- |
+| **深度图精度** | WebGL 深度缓冲精度不够，远处物体深度分层 | 用 `RGBADepthPacking` 将深度编码到 RGBA 4 通道，精度提升 256 倍 |
+| **帧率与导出速度** | 浏览器逐帧渲染 144 帧很慢 | 用 OffscreenCanvas + Web Worker 后台渲染；降低分辨率到 512×288 导出 |
+| **LLM 生成的场景不合理** | 物体穿插、比例失调 | 预置场景模板 + 后处理碰撞检测 + 约束规则（如"墙壁不能穿透"） |
+| **摄像机轨迹不平滑** | LLM 生成的关键帧之间抖动 | 强制用 CatmullRom 样条插值 + 加速度限制 |
+| **视频模型不接受深度图** | 有些 API 只接受 RGB 视频 | 将深度图伪彩色化（Jet colormap）编码为 RGB MP4，模型端再解码 |
+| **Web 端性能** | 复杂场景 WebGL 卡顿 | MVP 限制物体数量 < 50；用 InstancedMesh 批量渲染 |
+
+---
+
+## 六、竞品参考和差异化
+
+| 现有工具 | 它们做了什么 | 你的差异化 |
+| :--- | :--- | :--- |
+| **Runway Camera Control** | 滑杆控制运镜方向 | 你有完整 3D 场景编辑，不只是运镜 |
+| **Luma Keyframes** | 首尾帧控制 | 你有中间关键帧 + 3D 空间物体控制 |
+| **Wonder Studio** | 实拍 → CG 替换 | 你是纯 AI 生成，不需要实拍素材 |
+| **Decart Oasis** | 实时 AI 世界 | 你是精确可控的导演工具，不是随机生成 |
+| **Blender + ComfyUI** | 专业管线 | 你在 Web 上，零安装，AI 自动生成场景 |
+
+**你最大的差异化卖点：**
+> **"导演不需要会 3D 软件。说一句话，AI 搭场景、排运镜，导演只需要微调和确认。"**
+
+这把传统需要 3D 美术 + 动画师 + 合成师一周的工作，压缩到导演一个人 30 分钟完成。
+
+---
+

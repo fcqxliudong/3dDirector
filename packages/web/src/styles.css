@@ -1,0 +1,68 @@
+/* 3D 导演台 · 全局样式 · 与 server-php/index.php 占位页同调性（cream + 焦糖橙） */
+
+:root {
+  --bg: #f7f5f0;
+  --paper: #ffffff;
+  --ink: #14171e;
+  --ink-2: #3a4256;
+  --muted: #7c7a72;
+  --line: #e9e3d6;
+  --line-soft: #f0ead9;
+  --primary: #c97b3f;
+  --primary-soft: #f5e6d4;
+  --accent: #2f6f5e;
+  --accent-soft: #dde9e3;
+  --warn: #b06367;
+  --canvas-bg: #1c1b1a;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Outfit', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 5px 12px;
+  border-radius: 6px;
+  transition: all .15s ease;
+}
+button:hover { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
+button:active { transform: translateY(1px); }
+button.primary { background: var(--primary); color: white; border-color: var(--primary); }
+button.primary:hover { background: #b56d36; border-color: #b56d36; color: white; }
+button.accent { background: var(--accent); color: white; border-color: var(--accent); }
+button:disabled { opacity: .4; cursor: not-allowed; }
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 4px 8px;
+  border-radius: 5px;
+  outline: none;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
+input[type="color"] { padding: 2px; height: 28px; width: 32px; cursor: pointer; }
+
+code, .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+h1, h2, h3, h4 { font-family: 'DM Serif Display', serif; font-weight: 400; margin: 0; color: var(--ink); letter-spacing: -.005em; }
+hr { border: none; border-top: 1px dashed var(--line); margin: 12px 0; }
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+::-webkit-scrollbar-track { background: transparent; }

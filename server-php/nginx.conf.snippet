@@ -1,0 +1,108 @@
+# ============================================================================
+# 3D 导演台 · Nginx 最小补丁
+#
+# 重要：你可能不需要新增 location 块。
+# 因为 3D 导演台是 ai_video 子目录 · 同域名 · 现有 ai_video 的
+# `location ~ \.php$ { fastcgi_pass ... }` 会自动处理 PHP 文件。
+#
+# 这个文件只列出**必须 / 建议**加的参数：
+#   1. 必须：client_max_body_size 50M （上传粗略 mp4）
+#   2. 建议：lib/ data/ 禁止外网访问（安全）
+#   3. 建议：静态资源 long cache（性能）
+#
+# 找到 ai_video 已有的 server 块，把下面 3 段分别插入对应位置。
+# Nginx 1.30.4
+# ============================================================================
+
+# ─── 1. 必须改：上传大小（最常见踩坑点） ──────────────────────────────────
+#
+# 在 server { ... } 块里加这一行：
+#
+#    client_max_body_size 50M;
+#
+# 默认 1M · 上传 5-50MB 的粗略 mp4 会 413 Request Entity Too Large
+# 设在 server 块级别 · 对所有 PHP 生效
+
+# ─── 2. 推荐改：API 路由（用 try_files 自动 dispatch） ──────────────────────
+#
+# 6 个 API endpoint 已写好 · 默认 /ai_video/director_stage/api/*.php 直接由
+# Nginx 的 fastcgi_pass 处理 · 无需额外路由规则
+#
+# 如果 ai_video 现有配置是"无扩展名拒绝" · 需要加这段让 .php 走 PHP-FPM：
+#
+#    location ~ ^/ai_video/director_stage/api/.+\.php$ {
+#        include fastcgi_params;
+#        fastcgi_pass unix:/run/php/php-fpm.sock;
+#        fastcgi_param SCRIPT_FILENAME $request_filename;
+#        fastcgi_param DOCUMENT_ROOT /home/wwwroot/ai_video/director_stage;
+#        fastcgi_read_timeout 60s;
+#    }
+#
+# 6 个 endpoint 路由：
+#   GET  /api/director_stage_schema.php       (暴露 v0.1 schema)
+#   GET  /api/director_stage_assets.php       (启动包)
+#   POST /api/director_stage_scene.php?action=save|load|list|delete
+#   POST /api/director_stage_render.php?action=submit|get|list
+#   POST /api/director_stage_scene_agent.php (LLM 生成场景)
+#   POST /api/director_stage_selfcheck.php   (多模态审片)
+
+# ─── 2. 建议改：禁止访问 lib/ data/ schema/ 源码与数据 ─────────────────────
+#
+# 在 server { ... } 块里加这一段（独立 location 块，不影响其他 PHP）：
+#
+#    # 禁止外网访问导演台源码与场景数据
+#    location ~ ^/ai_video/director_stage/(lib|data|schema)/ {
+#        deny all;
+#        return 403;
+#    }
+#
+# 防止意外泄露 PHP 源码 + 用户的场景 JSON
+# 如果你想严谨，连 schema/ 都要 deny
+
+# ─── 3. 建议改：Vite 编译产物的 immutable 缓存 ─────────────────────────────
+#
+# 在 server { ... } 块里加这一段：
+#
+#    # 导演台前端 R3F 编译产物（Vite hash 文件名）· 长期缓存
+#    location ~* ^/ai_video/director_stage/static/.+\.(js|css|wasm|png|jpg|svg|woff2?)$ {
+#        expires 1y;
+#        add_header Cache-Control "public, immutable";
+#        try_files $uri =404;
+#    }
+#    location ~* ^/ai_video/director_stage/static/.+\.html$ {
+#        expires -1;
+#        add_header Cache-Control "no-cache, no-store, must-revalidate";
+#    }
+#
+# Vite 默认会带 hash（如 main.abc123.js）· immutable 缓存安全
+# HTML 入口必须每次校验（部署后即时看到）
+
+# ─── 不需要做的事 ─────────────────────────────────────────────────────────
+#
+# ❌ 新增独立 location ^~ /ai_video/director_stage/ 块
+#    → 现有 ai_video 的 .php 块会自动处理，没必要拆
+#
+# ❌ 新增 fastcgi_pass 配置
+#    → 复用 ai_video 已有的 PHP-FPM 配置
+#
+# ❌ 新增 try_files fallback
+#    → director_stage/ 没有 SPA 多路由需求（直接访问 index.php 就行）
+
+# ============================================================================
+# 应用补丁后：
+# ============================================================================
+#
+# sudo nginx -t                  # 检查语法
+# sudo systemctl reload nginx    # 平滑重载（不中断现有服务）
+#
+# 验证：
+#   curl -I https://your-domain/ai_video/director_stage/
+#   # 期望：HTTP/1.1 200 OK
+#
+#   curl -I https://your-domain/ai_video/director_stage/lib/
+#   # 期望：HTTP/1.1 403 Forbidden
+#
+#   curl -X POST -F "file=@test.mp4" https://your-domain/ai_video/director_stage/api/upload
+#   # 期望：不被 413 拒绝
+#
+# ============================================================================

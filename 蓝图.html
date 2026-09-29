@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>3D 导演台 · 整合方案蓝图 v2（商业 API 路线）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f7f5f0;
+  --paper:#ffffff;
+  --ink:#14171e;
+  --ink-2:#3a4256;
+  --muted:#7c7a72;
+  --line:#e9e3d6;
+  --line-soft:#f0ead9;
+  --primary:#c97b3f;
+  --primary-soft:#f5e6d4;
+  --accent:#2f6f5e;
+  --accent-soft:#dde9e3;
+  --warn:#b06367;
+  --code-bg:#1c1b1a;
+  --code-fg:#f7f5ec;
+  --v2-tag:#2f6f5e;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Outfit','PingFang SC','Microsoft YaHei',sans-serif;font-size:14.5px;line-height:1.62;-webkit-font-smoothing:antialiased}
+body{
+  background:
+    radial-gradient(circle at 8% 4%, rgba(201,123,63,.10), transparent 38%),
+    radial-gradient(circle at 92% 96%, rgba(47,111,94,.08), transparent 42%),
+    var(--bg);
+}
+.wrap{max-width:1080px;margin:0 auto;padding:48px 28px 80px}
+
+/* ── Header ─────────────────────────────────────────── */
+header.hero{padding:28px 0 44px;border-bottom:1px dashed var(--line)}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;padding:5px 11px;background:var(--primary-soft);color:var(--primary);border-radius:99px;font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:18px}
+.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--primary)}
+.eyebrow.v2{background:var(--accent-soft);color:var(--accent)}
+.eyebrow.v2 .dot{background:var(--accent)}
+h1{font-family:'DM Serif Display',serif;font-weight:400;font-size:38px;line-height:1.18;letter-spacing:-.01em;margin:0 0 14px;color:var(--ink)}
+.lede{font-size:16.5px;color:var(--ink-2);max-width:720px;margin:0}
+.lede strong{color:var(--primary);font-weight:600}
+.meta-row{display:flex;flex-wrap:wrap;gap:14px;margin-top:22px;font-size:12.5px;color:var(--muted)}
+.meta-row span{display:inline-flex;align-items:center;gap:6px}
+.meta-row .sep{color:var(--line)}
+.version-note{margin-top:18px;padding:14px 18px;background:var(--accent-soft);border-left:3px solid var(--accent);border-radius:8px;font-size:13px;color:var(--ink-2)}
+.version-note strong{color:var(--accent);font-weight:600}
+.version-note .strike{text-decoration:line-through;color:var(--muted)}
+
+/* ── Section ─────────────────────────────────────────── */
+section{padding:52px 0;border-bottom:1px dashed var(--line)}
+section:last-of-type{border-bottom:none}
+.section-head{display:flex;align-items:baseline;gap:14px;margin-bottom:8px}
+.section-num{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--primary);font-weight:500;letter-spacing:.04em}
+h2{font-family:'DM Serif Display',serif;font-weight:400;font-size:26px;line-height:1.25;margin:0;color:var(--ink);letter-spacing:-.005em}
+.section-sub{color:var(--ink-2);font-size:14.5px;margin:6px 0 28px;max-width:720px}
+
+/* ── Position strip ─────────────────────────────────── */
+.position{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:22px 26px;display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:center}
+.position-icon{width:54px;height:54px;border-radius:12px;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;color:var(--primary);flex-shrink:0}
+.position h3{font-family:'DM Serif Display',serif;font-weight:400;font-size:19px;margin:0 0 6px;color:var(--ink)}
+.position p{margin:0;color:var(--ink-2);font-size:13.5px}
+.position p strong{color:var(--primary);font-weight:600}
+
+/* ── Architecture SVG ────────────────────────────────── */
+.arch-svg{width:100%;height:auto;background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:20px;display:block}
+.arch-caption{font-size:12.5px;color:var(--muted);margin-top:10px;text-align:center}
+
+/* ── Workflow (horizontal flow) ─────────────────────── */
+.flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px 16px}
+.flow-step{flex:1 1 110px;min-width:0;padding:14px 12px;position:relative;text-align:center}
+.flow-step:not(:last-child)::after{content:"";position:absolute;right:-6px;top:50%;transform:translateY(-50%);width:12px;height:12px;border-top:1.5px solid var(--line);border-right:1.5px solid var(--line);transform:translateY(-50%) rotate(45deg);z-index:2;background:var(--paper)}
+.flow-num{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--muted);font-weight:500}
+.flow-label{font-weight:600;color:var(--ink);font-size:13.5px;margin:4px 0 6px}
+.flow-desc{font-size:11.5px;color:var(--ink-2);line-height:1.45}
+.flow-icon{width:30px;height:30px;border-radius:8px;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center;margin:0 auto 6px}
+.flow-step.simplified{background:var(--accent-soft);border-radius:8px;margin:-4px -6px;padding:18px 12px}
+
+/* ── Two-doc evaluation ─────────────────────────────── */
+.compare{background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:11px 14px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line-soft)}
+th{background:var(--bg);font-weight:600;color:var(--ink-2);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+tr:last-child td{border-bottom:none}
+td.dim{color:var(--ink-2)}
+.tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:600;line-height:1.55}
+.tag.pri{background:var(--primary-soft);color:var(--primary)}
+.tag.ok{background:var(--accent-soft);color:var(--accent)}
+.tag.dim{background:#eeebe2;color:var(--muted)}
+.tag.warn{background:#f3e1de;color:var(--warn)}
+
+/* ── Optimize cards (2-col grid) ────────────────────── */
+.opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.opt{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:18px 20px;transition:transform .15s ease}
+.opt:hover{transform:translateY(-1px);box-shadow:0 4px 16px -4px rgba(20,23,42,.06)}
+.opt-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.opt-num{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--primary);font-weight:600;background:var(--primary-soft);padding:2px 8px;border-radius:6px}
+.opt-title{font-weight:600;color:var(--ink);font-size:14.5px;margin:0}
+.opt p{margin:0;color:var(--ink-2);font-size:13px;line-height:1.55}
+.opt p strong{color:var(--ink);font-weight:600}
+.opt p code{font-family:'JetBrains Mono',monospace;font-size:11.5px;background:#f0ead9;padding:1px 5px;border-radius:3px;color:var(--primary)}
+.opt.simplified{border-left:3px solid var(--accent)}
+
+/* ── Module grid ────────────────────────────────────── */
+.module-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.module{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:18px 18px 16px}
+.module-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+.module-icon.p{background:var(--primary-soft);color:var(--primary)}
+.module-icon.a{background:var(--accent-soft);color:var(--accent)}
+.module-icon.w{background:#f3e1de;color:var(--warn)}
+.module h4{margin:0 0 6px;font-size:14.5px;font-weight:600;color:var(--ink)}
+.module p{margin:0;color:var(--ink-2);font-size:12.5px;line-height:1.5}
+.module .tech{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+
+/* ── Decision table ─────────────────────────────────── */
+.decide{background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.decide th{background:var(--ink);color:var(--paper);font-size:11.5px;letter-spacing:.06em}
+.decide td{font-size:13px}
+.decide td:nth-child(1){font-weight:600;color:var(--ink);white-space:nowrap}
+.decide td code{font-family:'JetBrains Mono',monospace;font-size:11.5px;background:#f0ead9;padding:1px 5px;border-radius:3px;color:var(--primary)}
+.decide td .strike{text-decoration:line-through;color:var(--muted)}
+
+/* ── MVP timeline ────────────────────────────────────── */
+.mvp{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.mvp-week{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:18px 16px;position:relative;overflow:hidden}
+.mvp-week::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--primary)}
+.mvp-week.accent::before{background:var(--accent)}
+.mvp-week.lock::before{background:var(--muted)}
+.mvp-wk{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.04em}
+.mvp-title{font-weight:600;color:var(--ink);font-size:14px;margin:6px 0 8px;line-height:1.35}
+.mvp ul{margin:8px 0 0;padding:0;list-style:none;font-size:12.5px;color:var(--ink-2);line-height:1.55}
+.mvp li{padding:3px 0 3px 14px;position:relative}
+.mvp li::before{content:"•";position:absolute;left:2px;color:var(--primary);font-weight:600}
+.mvp-skip{margin-top:14px;font-size:11.5px;color:var(--muted);font-style:italic;border-top:1px dashed var(--line);padding-top:10px}
+
+/* ── Rough video spec table ─────────────────────────── */
+.spec{background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.spec th{background:var(--ink);color:var(--paper);font-size:11.5px}
+.spec td:nth-child(1){font-weight:600;color:var(--ink);white-space:nowrap}
+
+/* ── Risk table ─────────────────────────────────────── */
+.risk{background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.risk td{font-size:12.5px}
+.risk td:first-child{font-weight:600;color:var(--ink);white-space:nowrap}
+.risk .p-hi{color:var(--warn);font-weight:600}
+.risk .p-mid{color:var(--primary);font-weight:600}
+.risk .p-lo{color:var(--accent);font-weight:600}
+
+/* ── Comparison: old vs new ─────────────────────────── */
+.diff{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.diff-col{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+.diff-col h4{margin:0 0 8px;font-size:13.5px;font-weight:600}
+.diff-col.old h4{color:var(--muted)}
+.diff-col.new h4{color:var(--accent)}
+.diff-col table{font-size:12.5px}
+.diff-col th{background:transparent;color:var(--ink-2);text-transform:none;letter-spacing:0;font-size:12px;font-weight:500;padding:6px 8px}
+.diff-col td{padding:6px 8px;font-size:12.5px}
+.diff-old{text-decoration:line-through;color:var(--muted)}
+.diff-new{color:var(--ink);font-weight:500}
+
+/* ── Code block ─────────────────────────────────────── */
+.code{background:var(--code-bg);color:var(--code-fg);border-radius:10px;padding:14px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.65;overflow-x:auto;margin:10px 0}
+.code .k{color:#e0a878}
+.code .s{color:#9ec99b}
+.code .c{color:#7c7a72;font-style:italic}
+.code .n{color:#c97b3f}
+
+/* ── Footer ─────────────────────────────────────────── */
+footer.hero{padding:28px 0 0;margin-top:30px;border-top:1px dashed var(--line);font-size:12.5px;color:var(--muted);text-align:center}
+
+/* ── Responsive ─────────────────────────────────────── */
+@media (max-width:860px){
+  .wrap{padding:32px 18px 60px}
+  h1{font-size:30px}
+  h2{font-size:22px}
+  .opt-grid,.module-grid,.mvp,.diff{grid-template-columns:1fr}
+  .position{grid-template-columns:1fr}
+  .flow-step{flex:1 1 45%}
+  .flow-step:nth-child(even)::after{display:none}
+  .flow-step.simplified{flex:1 1 100%;margin:0}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="eyebrow v2"><span class="dot"></span>v2 · 商业 API 简化路线</span>
+  <h1>3D 导演台 · 单 RGB 粗略视频参考路线</h1>
+  <p class="lede">
+    基于 <strong>策划 001（JSON SSOT + 自校验）</strong> 的整合方案。<strong>v2 简化</strong>：砍掉 ComfyUI 自建，
+    视频模型只用商业 API（可灵 / 火山 / 海螺 / Veo），导出单 RGB <strong>颜色形状区分</strong>的 mp4。
+  </p>
+  <div class="version-note">
+    <strong>v2 决策：</strong> 视频模型入口 <span class="strike">ComfyUI 自建 + Wan2.1 + CameraCtrl</span> → <strong>商业 API 远程调用</strong>；
+    导出通道 <span class="strike">RGB + Depth + Normal + Seg 四通道</span> → <strong>单 RGB · 颜色形状区分</strong>。
+    砍掉 GPU / 模型权重 / 容器维护，<strong>上线更快、零运维、模型自动升级</strong>。
+  </div>
+  <div class="meta-row">
+    <span>● 仅 Web 浏览器</span><span class="sep">/</span>
+    <span>● 自研</span><span class="sep">/</span>
+    <span>● 单 RGB 粗略参考视频</span><span class="sep">/</span>
+    <span>● 商业 API 调度</span><span class="sep">/</span>
+    <span>● 4 周 MVP</span>
+  </div>
+</header>
+
+<!-- 一句话定位 -->
+<section>
+  <div class="section-head"><span class="section-num">§01</span><h2>一句话定位</h2></div>
+  <div class="position">
+    <div class="position-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4"/><path d="M3 17l9 4 9-4"/></svg>
+    </div>
+    <div>
+      <h3>3D 导演台 = 视频模型的前置确定性分镜工具</h3>
+      <p>不替代视频模型，只做<strong>"前置分镜"</strong>。导演一句话，AI 搭场景排运镜，导演微调确认，浏览器导出<strong>颜色形状区分的 mp4 粗略视频</strong>喂给可灵等商业 API，拿到最终视频。<strong>零自建、零 GPU、零运维</strong>。</p>
+    </div>
+  </div>
+</section>
+
+<!-- v1 vs v2 对比 -->
+<section>
+  <div class="section-head"><span class="section-num">§02</span><h2>v1 → v2 · 简化前后对比</h2></div>
+  <p class="section-sub">核心简化 = 砍 ComfyUI + 砍多通道渲染。整个产品轻一半，但 90% 用例不受影响。</p>
+  <div class="diff">
+    <div class="diff-col old">
+      <h4>v1 · 重型路线</h4>
+      <table>
+        <tr><td>视频模型入口</td><td class="diff-old">自建 ComfyUI + Wan2.1 + CameraCtrl</td></tr>
+        <tr><td>导出通道</td><td class="diff-old">RGB + Depth + Normal + Seg 四通道</td></tr>
+        <tr><td>前端帧渲染</td><td class="diff-old">OffscreenCanvas + Worker + WebCodecs</td></tr>
+        <tr><td>后端</td><td class="diff-old">FastAPI + ComfyUI 容器 + GPU</td></tr>
+        <tr><td>核心差异</td><td class="diff-old">精确运镜控制 + 深度引导</td></tr>
+        <tr><td>运维</td><td class="diff-old">GPU 机器 + 模型权重 20GB+</td></tr>
+      </table>
+    </div>
+    <div class="diff-col new">
+      <h4>v2 · 商业 API 路线 ✓</h4>
+      <table>
+        <tr><td>视频模型入口</td><td class="diff-new">商业 API（可灵 / 火山 / 海螺 / Veo）</td></tr>
+        <tr><td>导出通道</td><td class="diff-new">单 RGB · 颜色形状区分</td></tr>
+        <tr><td>前端帧渲染</td><td class="diff-new">canvas.captureStream + MediaRecorder</td></tr>
+        <tr><td>后端</td><td class="diff-new">轻量 Web 服务（Node / FastAPI 都行）</td></tr>
+        <tr><td>核心差异</td><td class="diff-new">前置分镜的运动信号 + 构图约束</td></tr>
+        <tr><td>运维</td><td class="diff-new">零（API Key + 静态托管）</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 核心工作流 -->
+<section>
+  <div class="section-head"><span class="section-num">§03</span><h2>核心工作流 · 七步闭环</h2></div>
+  <p class="section-sub">从自然语言剧本到最终视频，全程 Web 浏览器，关键节点自带校验回路。</p>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <div class="flow-num">STEP 01</div>
+      <div class="flow-label">剧本输入</div>
+      <div class="flow-desc">自然语言描述场景 + 运镜</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg></div>
+      <div class="flow-num">STEP 02</div>
+      <div class="flow-label">Agent 生成 JSON</div>
+      <div class="flow-desc">模板库 + 调参，输出结构化场景</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+      <div class="flow-num">STEP 03</div>
+      <div class="flow-label">3D 实时渲染</div>
+      <div class="flow-desc">R3F 视口，导演所见即所得</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
+      <div class="flow-num">STEP 04</div>
+      <div class="flow-label">导演微调</div>
+      <div class="flow-desc">拖拽 / 改 JSON / 加物体</div>
+    </div>
+    <div class="flow-step simplified">
+      <div class="flow-icon" style="background:#fff;color:var(--accent)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+      <div class="flow-num">STEP 05 · v2 简化</div>
+      <div class="flow-label">粗略 mp4 导出</div>
+      <div class="flow-desc">单 RGB · 颜色形状区分 · MediaRecorder</div>
+    </div>
+    <div class="flow-step simplified">
+      <div class="flow-icon" style="background:#fff;color:var(--accent)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+      <div class="flow-num">STEP 06 · v2 简化</div>
+      <div class="flow-label">调商业 API</div>
+      <div class="flow-desc">可灵 / 火山 / 海螺 任选</div>
+    </div>
+    <div class="flow-step" style="background:var(--accent-soft);border-radius:8px;margin:-4px -6px;padding:18px 12px">
+      <div class="flow-icon" style="background:#fff;color:var(--accent)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+      <div class="flow-num">STEP 07 · 闭环</div>
+      <div class="flow-label">自校验</div>
+      <div class="flow-desc">多模态 LLM 审片，不通过回 STEP 02/04</div>
+    </div>
+  </div>
+</section>
+
+<!-- 粗略视频规范 -->
+<section>
+  <div class="section-head"><span class="section-num">§04</span><h2>粗略视频规范 · 颜色形状区分</h2></div>
+  <p class="section-sub">导演台输出的 mp4 长什么样。<strong>越简单越好</strong>——粗略视频是给视频模型的"运动信号"，不是给导演看的成品。</p>
+  <div class="spec">
+    <table>
+      <thead><tr><th style="width:18%">元素</th><th style="width:42%">规则</th><th style="width:40%">为什么</th></tr></thead>
+      <tbody>
+        <tr><td>角色</td><td class="dim">胶囊体 + 不同纯色（红 #e74c3c / 蓝 #3498db / 绿 #2ecc71 / 黄 #f1c40f）+ Mixamo 动画（站/走/跑/坐）</td><td class="dim">模型能清晰区分主体；纯色不污染视觉风格</td></tr>
+        <tr><td>环境</td><td class="dim">几何体（box / sphere / cylinder）+ 纯色 + 简单方向光</td><td class="dim">不带 PBR / 不带纹理，避免细节污染</td></tr>
+        <tr><td>地面</td><td class="dim">单色 plane + 简单网格（可选）</td><td class="dim">给模型空间感</td></tr>
+        <tr><td>运镜</td><td class="dim">6 个模板（push_in / pull_out / orbit / crane_up / tracking / static）+ CatmullRom 平滑</td><td class="dim">模板化保证稳定性</td></tr>
+        <tr><td>帧率</td><td class="dim">24fps</td><td class="dim">商业视频模型通用帧率</td></tr>
+        <tr><td>时长</td><td class="dim"><strong>用户可自定义</strong> · 1-30s <span style="color:var(--warn);font-size:11px;font-weight:600">· 硬约束</span></td><td class="dim">导演按镜头需求设；最长 30s（商业 API 单次生成上限）· <strong>超 30s 不做拼接</strong></td></tr>
+        <tr><td>分辨率</td><td class="dim">720p（1280×720）或 1080p（1920×1080）</td><td class="dim">模型接口常用规格</td></tr>
+        <tr><td rowspan="8">画面比例</td><td class="dim"><strong>2.76:1</strong> · Ultra Panavision 70</td><td class="dim">早期 70mm 宽幅（《阿拉伯的劳伦斯》《2001 太空漫游》原始版）</td></tr>
+        <tr><td class="dim"><strong>2.39:1</strong> · Scope / Anamorphic</td><td class="dim">现代电影主流（《沙丘》《银翼杀手 2049》《奥本海默》）</td></tr>
+        <tr><td class="dim"><strong>2.00:1</strong> · IMAX 增强</td><td class="dim">IMAX 数字影厅 / Netflix 顶级剧集（《怪奇物语》《1899》）</td></tr>
+        <tr><td class="dim"><strong>1.85:1</strong> · Flat</td><td class="dim">北美院线标准宽银幕（绝大多数好莱坞剧情片）</td></tr>
+        <tr><td class="dim"><strong>16:9 (1.78:1)</strong></td><td class="dim">HDTV / 流媒体主流（B站 / YouTube / 优爱腾）</td></tr>
+        <tr><td class="dim"><strong>4:3 (1.33:1)</strong> · Academy</td><td class="dim">早期学院标准 / 复古艺术片 / Wes Anderson（《布达佩斯大饭店》）</td></tr>
+        <tr><td class="dim"><strong>9:16</strong></td><td class="dim">短视频 / 移动端（抖音 / Reels / TikTok / 视频号）</td></tr>
+        <tr><td class="dim"><strong>1:1</strong></td><td class="dim">社交方形（Instagram / 小红书）</td></tr>
+        <tr><td>编码</td><td class="dim">H.264 MP4，yuv420p</td><td class="dim">兼容性最强</td></tr>
+        <tr><td>通道</td><td class="dim"><strong>单 RGB</strong>（不要深度 / 法线 / 分割）</td><td class="dim">商业 API 主要吃 RGB</td></tr>
+        <tr><td>音频</td><td class="dim">无</td><td class="dim">视频模型只生成视频</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 简化后的架构图 -->
+<section>
+  <div class="section-head"><span class="section-num">§05</span><h2>v2 简化架构</h2></div>
+  <p class="section-sub">浏览器做全部用户交互 + mp4 导出，后端只做视频模型 API 调度 + 自校验。</p>
+
+<svg class="arch-svg" viewBox="0 0 880 540" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g1" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#f5e6d4"/>
+      <stop offset="1" stop-color="#faf3e9"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#dde9e3"/>
+      <stop offset="1" stop-color="#eaf2ee"/>
+    </linearGradient>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7c7a72"/>
+    </marker>
+  </defs>
+
+  <!-- Browser outer -->
+  <rect x="20" y="20" width="840" height="320" rx="14" fill="#ffffff" stroke="#e9e3d6" stroke-width="1.5"/>
+  <text x="42" y="46" font-family="Outfit" font-size="13" fill="#7c7a72" font-weight="600">Web 浏览器 · 用户全部接触面</text>
+
+  <!-- Chat panel -->
+  <rect x="40" y="60" width="180" height="60" rx="10" fill="#f0ead9" stroke="#e9e3d6"/>
+  <text x="58" y="83" font-family="Outfit" font-size="11.5" fill="#7c7a72" font-weight="600">对话面板</text>
+  <text x="58" y="100" font-family="Outfit" font-size="10.5" fill="#7c7a72">"废弃太空站走廊…"</text>
+  <text x="58" y="113" font-family="Outfit" font-size="10.5" fill="#7c7a72">自然语言剧本</text>
+
+  <!-- Agent layer -->
+  <rect x="240" y="60" width="180" height="60" rx="10" fill="url(#g1)" stroke="#c97b3f" stroke-opacity=".4"/>
+  <text x="258" y="83" font-family="Outfit" font-size="11.5" fill="#c97b3f" font-weight="600">LLM 智能体层</text>
+  <text x="258" y="100" font-family="Outfit" font-size="10.5" fill="#3a4256">模板库 + 工具调用</text>
+  <text x="258" y="113" font-family="Outfit" font-size="10.5" fill="#3a4256">→ 场景 JSON</text>
+
+  <line x1="220" y1="90" x2="240" y2="90" stroke="#7c7a72" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- JSON SSOT strip -->
+  <rect x="40" y="140" width="800" height="40" rx="8" fill="#14171e"/>
+  <text x="58" y="164" font-family="JetBrains Mono" font-size="11.5" fill="#f5e6d4" font-weight="500">scene.json  ←── 单一数据源（SSOT）─── Zustand 镜像</text>
+
+  <!-- Editor (3 sub panels) -->
+  <rect x="40" y="200" width="380" height="120" rx="10" fill="url(#g1)" stroke="#c97b3f" stroke-opacity=".35"/>
+  <text x="58" y="222" font-family="Outfit" font-size="11.5" fill="#c97b3f" font-weight="600">3D 视口 · R3F 实时预览（导演看的）</text>
+  <text x="58" y="240" font-family="Outfit" font-size="10.5" fill="#3a4256">OrbitControls · TransformControls</text>
+  <text x="58" y="255" font-family="Outfit" font-size="10.5" fill="#3a4256">胶囊角色 + Mixamo 动画</text>
+  <text x="58" y="270" font-family="Outfit" font-size="10.5" fill="#3a4256">几何体白模 · 程序化光照</text>
+  <text x="58" y="290" font-family="Outfit" font-size="10.5" fill="#7c7a72">渲染给演员：精细预览 · 渲染给模型：粗略预览</text>
+
+  <rect x="430" y="200" width="200" height="120" rx="10" fill="#ffffff" stroke="#e9e3d6"/>
+  <text x="448" y="222" font-family="Outfit" font-size="11.5" fill="#3a4256" font-weight="600">运镜时间轴</text>
+  <text x="448" y="240" font-family="Outfit" font-size="10.5" fill="#7c7a72">push_in / pull_out / orbit /</text>
+  <text x="448" y="255" font-family="Outfit" font-size="10.5" fill="#7c7a72">crane_up / tracking / static</text>
+  <text x="448" y="270" font-family="Outfit" font-size="10.5" fill="#7c7a72">CatmullRom 平滑插值</text>
+  <text x="448" y="290" font-family="Outfit" font-size="10.5" fill="#c97b3f" font-weight="600">+ 关键帧曲线（高级）</text>
+
+  <rect x="640" y="200" width="200" height="120" rx="10" fill="#ffffff" stroke="#e9e3d6"/>
+  <text x="658" y="222" font-family="Outfit" font-size="11.5" fill="#3a4256" font-weight="600">资产 · 灯光 · 滤镜</text>
+  <text x="658" y="240" font-family="Outfit" font-size="10.5" fill="#7c7a72">色温 / 强度 / 方向</text>
+  <text x="658" y="255" font-family="Outfit" font-size="10.5" fill="#7c7a72">氛围（冷蓝 / 暮色…）</text>
+  <text x="658" y="270" font-family="Outfit" font-size="10.5" fill="#7c7a72">后处理 bloom / vignette</text>
+
+  <!-- Arrows down from JSON to editor -->
+  <line x1="230" y1="180" x2="230" y2="200" stroke="#7c7a72" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="530" y1="180" x2="530" y2="200" stroke="#7c7a72" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="740" y1="180" x2="740" y2="200" stroke="#7c7a72" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Single RGB recorder (v2 simplified) -->
+  <rect x="200" y="266" width="500" height="44" rx="22" fill="#2f6f5e"/>
+  <text x="450" y="286" font-family="Outfit" font-size="11.5" fill="#f7f5ec" font-weight="600" text-anchor="middle">单 RGB 渲染 · canvas.captureStream + MediaRecorder</text>
+  <text x="450" y="302" font-family="JetBrains Mono" font-size="10" fill="#dde9e3" text-anchor="middle">粗略预览 · 颜色形状区分 · H.264 MP4</text>
+
+  <line x1="450" y1="310" x2="450" y2="340" stroke="#7c7a72" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="460" y="328" font-family="Outfit" font-size="10" fill="#7c7a72">HTTP / WebSocket</text>
+
+  <!-- Backend -->
+  <rect x="20" y="345" width="840" height="180" rx="14" fill="#ffffff" stroke="#e9e3d6" stroke-width="1.5"/>
+  <text x="42" y="371" font-family="Outfit" font-size="13" fill="#7c7a72" font-weight="600">后端服务 · 轻量 Web（Node.js / FastAPI 都行）</text>
+
+  <rect x="40" y="389" width="170" height="118" rx="10" fill="url(#g1)" stroke="#c97b3f" stroke-opacity=".4"/>
+  <text x="58" y="412" font-family="Outfit" font-size="11.5" fill="#c97b3f" font-weight="600">Scene Agent</text>
+  <text x="58" y="430" font-family="Outfit" font-size="10" fill="#3a4256">GPT-4o / Claude</text>
+  <text x="58" y="445" font-family="Outfit" font-size="10" fill="#3a4256">结构化输出</text>
+  <text x="58" y="460" font-family="Outfit" font-size="10" fill="#3a4256">JSON Schema 校验</text>
+  <text x="58" y="479" font-family="JetBrains Mono" font-size="9.5" fill="#7c7a72">场景生成</text>
+
+  <rect x="230" y="389" width="200" height="118" rx="10" fill="url(#g2)" stroke="#2f6f5e" stroke-opacity=".5"/>
+  <text x="248" y="412" font-family="Outfit" font-size="11.5" fill="#2f6f5e" font-weight="600">商业 API Dispatcher</text>
+  <rect x="248" y="425" width="48" height="22" rx="5" fill="#f0ead9"/>
+  <text x="272" y="440" font-family="Outfit" font-size="10" fill="#7c7a72" text-anchor="middle">可灵</text>
+  <rect x="302" y="425" width="48" height="22" rx="5" fill="#f0ead9"/>
+  <text x="326" y="440" font-family="Outfit" font-size="10" fill="#7c7a72" text-anchor="middle">火山</text>
+  <rect x="356" y="425" width="40" height="22" rx="5" fill="#f0ead9"/>
+  <text x="376" y="440" font-family="Outfit" font-size="10" fill="#7c7a72" text-anchor="middle">海螺</text>
+  <rect x="402" y="425" width="20" height="22" rx="5" fill="#f0ead9"/>
+  <text x="412" y="440" font-family="Outfit" font-size="9" fill="#7c7a72" text-anchor="middle">Veo</text>
+  <text x="248" y="465" font-family="Outfit" font-size="10" fill="#3a4256">适配器模式</text>
+  <text x="248" y="480" font-family="Outfit" font-size="10" fill="#3a4256">统一调度 · 自动打包</text>
+
+  <rect x="450" y="389" width="170" height="118" rx="10" fill="url(#g2)" stroke="#2f6f5e" stroke-opacity=".4"/>
+  <text x="468" y="412" font-family="Outfit" font-size="11.5" fill="#2f6f5e" font-weight="600">Self-Check Agent</text>
+  <text x="468" y="430" font-family="Outfit" font-size="10" fill="#3a4256">多模态 LLM 审片</text>
+  <text x="468" y="445" font-family="Outfit" font-size="10" fill="#3a4256">首帧图 + 剧本 → 校验</text>
+  <text x="468" y="460" font-family="Outfit" font-size="10" fill="#3a4256">站位 / 朝向 / 构图</text>
+  <text x="468" y="479" font-family="JetBrains Mono" font-size="9.5" fill="#7c7a72">闭环回路</text>
+
+  <rect x="640" y="389" width="200" height="48" rx="8" fill="#ffffff" stroke="#e9e3d6"/>
+  <text x="658" y="407" font-family="Outfit" font-size="11" fill="#3a4256" font-weight="600">资产库</text>
+  <text x="658" y="424" font-family="Outfit" font-size="10" fill="#7c7a72">场景模板 · Mixamo 动画</text>
+
+  <rect x="640" y="445" width="200" height="62" rx="8" fill="#ffffff" stroke="#e9e3d6"/>
+  <text x="658" y="463" font-family="Outfit" font-size="11" fill="#3a4256" font-weight="600">JSON 版本库</text>
+  <text x="658" y="480" font-family="Outfit" font-size="10" fill="#7c7a72">diff-match-patch 增量</text>
+  <text x="658" y="493" font-family="Outfit" font-size="10" fill="#7c7a72">撤销 / 重做 / diff</text>
+
+  <!-- Self-check back to browser -->
+  <path d="M450 290 q0 40 -200 40" stroke="#2f6f5e" stroke-width="1.5" fill="none" stroke-dasharray="4 3" marker-end="url(#arr)" opacity=".55"/>
+  <text x="220" y="328" font-family="Outfit" font-size="9.5" fill="#2f6f5e" font-style="italic">不通过 → 回 STEP 04</text>
+</svg>
+  <p class="arch-caption">浏览器端做 3D 渲染 + 导演交互 + 单 RGB 视频导出，后端只做商业 API 调度 + 自校验。零 GPU、零模型、零容器。</p>
+</section>
+
+<!-- 七个核心模块 -->
+<section>
+  <div class="section-head"><span class="section-num">§06</span><h2>七个核心模块 · v2 调整</h2></div>
+  <p class="section-sub">每个模块独立可测、可替换。前端 5 个 + 后端 2 个。</p>
+  <div class="module-grid">
+    <div class="module">
+      <div class="module-icon p"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+      <h4>① Web 3D 引擎</h4>
+      <p>R3F 实时预览，TransformControls 拖拽，Gizmo 标注。50 个 mesh 内流畅。</p>
+      <div class="tech">Three.js · R3F · Drei</div>
+    </div>
+    <div class="module">
+      <div class="module-icon p"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg></div>
+      <h4>② 场景 / 运镜 Agent</h4>
+      <p>LLM + 模板库 + 工具化。模板选 + 调参 + 加细节，AABB 碰撞检测在工具层。</p>
+      <div class="tech">GPT-4o · Claude · Zod</div>
+    </div>
+    <div class="module">
+      <div class="module-icon p"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg></div>
+      <h4>③ 运镜曲线编辑器</h4>
+      <p>6 个运镜模板 + 关键帧曲线（高级）。CatmullRom 平滑插值，加速度限制。</p>
+      <div class="tech">CatmullRomCurve3</div>
+    </div>
+    <div class="module">
+      <div class="module-icon a"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+      <h4>④ 粗略视频导出 <span style="color:var(--accent);font-size:10px">v2 简化</span></h4>
+      <p>单 RGB · 颜色形状区分 · 浏览器原生 API。零额外依赖，零 ffmpeg.wasm。</p>
+      <div class="tech">canvas.captureStream · MediaRecorder</div>
+    </div>
+    <div class="module">
+      <div class="module-icon a"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+      <h4>⑤ 商业 API Dispatcher <span style="color:var(--accent);font-size:10px">v2 简化</span></h4>
+      <p>适配器模式统一调度 可灵 / 火山 / 海螺 / Veo。自动打包目标格式。</p>
+      <div class="tech">Adapter Pattern · HTTP</div>
+    </div>
+    <div class="module">
+      <div class="module-icon a"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+      <h4>⑥ Self-Check Agent</h4>
+      <p>多模态 LLM 审片。首帧图 + 剧本 → 站位 / 朝向 / 构图 校验，强制环节。</p>
+      <div class="tech">GPT-4o · Claude 3.5</div>
+    </div>
+    <div class="module">
+      <div class="module-icon p"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div>
+      <h4>⑦ 对话 / 反馈层</h4>
+      <p>导演用自然语言增删物体 / 改站位 / 调运镜，结果回写 JSON，编辑器同步更新。</p>
+      <div class="tech">Streaming · Function Call</div>
+    </div>
+  </div>
+</section>
+
+<!-- 关键技术决策 -->
+<section>
+  <div class="section-head"><span class="section-num">§07</span><h2>关键技术决策 · v2</h2></div>
+  <p class="section-sub">每个决策都给推荐 + 理由 + 替代方案。<strong style="color:var(--accent)">v2 简化</strong>项已标绿。</p>
+  <div class="decide">
+    <table>
+      <thead><tr><th>维度</th><th>推荐</th><th>理由</th><th>替代方案</th></tr></thead>
+      <tbody>
+        <tr><td>3D 渲染</td><td><code>Three.js + R3F + Drei</code></td><td>生态最大，TransformControls 现成</td><td>Babylon.js（企业级但生态弱）</td></tr>
+        <tr><td>状态管理</td><td><code>Zustand</code></td><td>JSON SSOT 镜像天然，轻量</td><td>Redux / Jotai</td></tr>
+        <tr><td>场景生成</td><td>模板库 + LLM 调参</td><td>生成快 / 几何合理 / 风格统一</td><td>LLM 自由生成（慢且易穿模）</td></tr>
+        <tr><td>运镜编辑</td><td>模板 + 滑杆（主）</td><td>95% 用户够用，学习成本低</td><td>纯关键帧编辑（专业但重）</td></tr>
+        <tr><td>角色</td><td>胶囊 + Mixamo 动画</td><td>MVP 复用现成动画库</td><td>VRM / glTF 角色（重）</td></tr>
+        <tr style="background:#f3f7f5"><td>帧渲染 <span class="tag ok" style="margin-left:4px">v2</span></td><td><code>canvas.captureStream + MediaRecorder</code></td><td>浏览器原生 API，零依赖，单 RGB 够用</td><td>WebCodecs / ffmpeg.wasm（更重）</td></tr>
+        <tr style="background:#f3f7f5"><td>深度图 <span class="tag ok" style="margin-left:4px">v2</span></td><td><span class="strike"><code>RGBADepthPacking</code></span> → <strong>不需要</strong></td><td>商业 API 不吃深度图，单 RGB 喂入</td><td>—</td></tr>
+        <tr style="background:#f3f7f5"><td>视频模型 <span class="tag ok" style="margin-left:4px">v2</span></td><td><span class="strike">ComfyUI + Wan2.1 + CameraCtrl</span> → <strong>可灵 API + 火山 / 海螺 / Veo</strong></td><td>零 GPU 零运维，模型自动升级</td><td>开源模型自建（重）</td></tr>
+        <tr><td>后端</td><td>Node.js 或 FastAPI 轻量</td><td>只是 API 代理，复杂度低</td><td>Serverless（Vercel / Cloudflare）</td></tr>
+        <tr><td>自校验</td><td>多模态 LLM（强制）</td><td>产品最大差异化</td><td>跳过（价值砍半）</td></tr>
+        <tr><td>JSON 版本</td><td><code>diff-match-patch</code></td><td>撤销 / 重做 / diff 一体</td><td>Git（重）</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 4 周 MVP 路线 -->
+<section>
+  <div class="section-head"><span class="section-num">§08</span><h2>4 周 MVP 路线图 · v2</h2></div>
+  <p class="section-sub">Week 3 大幅减负（ComfyUI → 商业 API）。第 4 周末公开 demo。</p>
+  <div class="mvp">
+    <div class="mvp-week lock">
+      <div class="mvp-wk">WEEK 01</div>
+      <div class="mvp-title">3D 视口 + JSON 解析</div>
+      <ul>
+        <li>Three.js + R3F 单文件 demo</li>
+        <li>输入 JSON → 拖拽场景</li>
+        <li>JSON Schema v0.1 + Zod</li>
+        <li>OrbitControls / TransformControls</li>
+      </ul>
+      <div class="mvp-skip">不做：AI / 运镜 / 导出</div>
+    </div>
+    <div class="mvp-week">
+      <div class="mvp-wk">WEEK 02</div>
+      <div class="mvp-title">场景 Agent + 粗略视频导出</div>
+      <ul>
+        <li>5 个场景模板（room / corridor / street / forest / space）</li>
+        <li>6 个运镜模板 + Mixamo 动画</li>
+        <li>LLM 工具调用（GPT-4o）</li>
+        <li><strong>MediaRecorder 录 mp4</strong></li>
+      </ul>
+      <div class="mvp-skip">不做：商业 API / 自校验</div>
+    </div>
+    <div class="mvp-week accent">
+      <div class="mvp-wk">WEEK 03 · v2 简化</div>
+      <div class="mvp-title">商业 API Dispatcher</div>
+      <ul>
+        <li><span class="strike">ComfyUI + Wan2.1 + CameraCtrl</span></li>
+        <li><strong>可灵 API 适配器（优先）</strong></li>
+        <li>火山 / 海螺 / Veo 适配器骨架</li>
+        <li>端到端：剧本 → 出片</li>
+      </ul>
+      <div class="mvp-skip">不做：自校验（推到 Week 4）</div>
+    </div>
+    <div class="mvp-week accent">
+      <div class="mvp-wk">WEEK 04</div>
+      <div class="mvp-title">自校验 + 闭环 Demo</div>
+      <ul>
+        <li>多模态 LLM 审片</li>
+        <li>首帧图 vs 剧本校验</li>
+        <li>导演一键回到编辑器</li>
+        <li>公开 demo 视频</li>
+      </ul>
+      <div class="mvp-skip">不做：协作 / 多模型调度</div>
+    </div>
+  </div>
+</section>
+
+<!-- JSON Schema 草案 -->
+<section>
+  <div class="section-head"><span class="section-num">§09</span><h2>JSON Schema 草案 · v0.1</h2></div>
+  <p class="section-sub">基于策划 001 的草案。MVP 第一周就冻结这个版本。</p>
+  <div class="code">
+<span class="c">// 单一数据源 · 智能体只读写这个</span>
+{
+  <span class="k">"scene"</span>: { <span class="k">"preset"</span>: <span class="s">"room_small"</span>, <span class="k">"size"</span>: [<span class="n">8</span>, <span class="n">3</span>, <span class="n">6</span>] },
+  <span class="k">"actors"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="s">"A"</span>, <span class="k">"label"</span>: <span class="s">"男主"</span>, <span class="k">"color"</span>: <span class="s">"#e74c3c"</span>,
+      <span class="k">"start"</span>: [-<span class="n">2</span>, <span class="n">0</span>, <span class="n">1</span>], <span class="k">"facing"</span>: [<span class="n">1</span>, <span class="n">0</span>, <span class="n">0</span>],
+      <span class="k">"pose"</span>: <span class="s">"stand"</span>,
+      <span class="k">"moves"</span>: [{ <span class="k">"to"</span>: [<span class="n">1</span>, <span class="n">0</span>, <span class="n">0</span>], <span class="k">"t0"</span>: <span class="n">1.0</span>, <span class="k">"t1"</span>: <span class="n">3.0</span>, <span class="k">"pose"</span>: <span class="s">"walk"</span> }]
+    }
+  ],
+  <span class="k">"camera"</span>: {
+    <span class="k">"fov"</span>: <span class="n">35</span>,
+    <span class="k">"keyframes"</span>: [
+      { <span class="k">"t"</span>: <span class="n">0</span>, <span class="k">"pos"</span>: [<span class="n">0</span>, <span class="n">1.6</span>, <span class="n">6</span>], <span class="k">"lookAt"</span>: <span class="s">"A"</span> },
+      { <span class="k">"t"</span>: <span class="n">4</span>, <span class="k">"pos"</span>: [<span class="n">0</span>, <span class="n">1.5</span>, <span class="n">3</span>], <span class="k">"lookAt"</span>: <span class="s">"B"</span>, <span class="k">"ease"</span>: <span class="s">"inOut"</span> }
+    ]
+  },
+  <span class="k">"duration"</span>: <span class="n">10</span>, <span class="k">"fps"</span>: <span class="n">24</span>, <span class="k">"aspect"</span>: <span class="s">"2.39:1"</span>
+}
+
+<span class="c">// duration: 用户可自定义 · 范围 1-30s（商业 API 单次生成上限）</span>
+<span class="c">// aspect 枚举: "2.39:1" (Scope) / "2.00:1" (IMAX) / "1.85:1" (Flat) /</span>
+<span class="c">//            "16:9" / "9:16" / "1:1"</span>
+<span class="c">// 关键设计 · lookAt 用 label 引用而不是坐标</span>
+<span class="c">// → 角色移动时镜头自动跟上，导演只关心"看谁"</span></div>
+</section>
+
+<!-- 风险与对策 -->
+<section>
+  <div class="section-head"><span class="section-num">§10</span><h2>风险与对策 · v2</h2></div>
+  <p class="section-sub">砍掉 ComfyUI 自建风险，新增商业 API 相关风险。</p>
+  <div class="risk">
+    <table>
+      <thead><tr><th style="width:25%">风险</th><th style="width:8%">概率</th><th style="width:8%">影响</th><th style="width:59%">对策</th></tr></thead>
+      <tbody>
+        <tr style="background:#f3f7f5"><td>视频模型不严格遵循参考 <span class="tag ok" style="margin-left:4px">v2 重点</span></td><td class="p-hi">高</td><td class="p-hi">高</td><td>准备 3-5 个备选镜头让导演重抽；提供"参考强度"滑杆；多模态自校验抓早期失败</td></tr>
+        <tr><td>商业 API 输出与参考不一致</td><td class="p-hi">高</td><td class="p-mid">中</td><td>Dispatcher 自动重试 + 缓存 + 多模型 failover</td></tr>
+        <tr style="background:#f3f7f5"><td>WebCodecs 浏览器兼容 <span class="tag ok" style="margin-left:4px">v2 缓解</span></td><td class="p-lo">低</td><td class="p-mid">中</td><td>MediaRecorder 兼容性 > WebCodecs（Firefox 也支持）；零特殊依赖</td></tr>
+        <tr><td>Web 端性能瓶颈</td><td class="p-mid">中</td><td class="p-mid">中</td><td>限制物体 &lt; 50；<code>InstancedMesh</code>；预览分辨率 720p</td></tr>
+        <tr><td>LLM 场景不合理（穿模）</td><td class="p-mid">中</td><td class="p-mid">中</td><td>模板库 + Agent 工具层 AABB 碰撞检测 + 约束规则</td></tr>
+        <tr style="background:#f3f7f5"><td>商业 API 限流 / 慢 / 贵 <span class="tag ok" style="margin-left:4px">v2 新增</span></td><td class="p-hi">高</td><td class="p-mid">中</td><td>任务队列 + 缓存首帧图；多模型 failover；按调用付费预估上限</td></tr>
+        <tr><td>角色动画质量低</td><td class="p-mid">中</td><td class="p-mid">中</td><td>MVP 用 Mixamo 通用动画库；不上手动 K 帧</td></tr>
+        <tr style="background:#f3f7f5"><td>ComfyUI 自建成本 <span class="tag ok" style="margin-left:4px">删除</span></td><td class="p-mid">—</td><td class="p-mid">—</td><td><strong style="color:var(--accent)">v2 已消除</strong> · 零 GPU / 零模型 / 零容器</td></tr>
+        <tr><td>LLM 调用成本失控</td><td class="p-mid">中</td><td class="p-mid">中</td><td>首屏用小模型（Haiku / GPT-4o-mini）生成模板选择，复杂对话用大模型</td></tr>
+        <tr style="background:#f3f7f5"><td>商业 API 接口变更 <span class="tag ok" style="margin-left:4px">v2 新增</span></td><td class="p-mid">中</td><td class="p-mid">中</td><td>Dispatcher 适配器隔离变化；版本化适配器；2-3 家备选</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 下一步 -->
+<section>
+  <div class="section-head"><span class="section-num">§11</span><h2>下一步 · 选一条开干</h2></div>
+  <p class="section-sub">v2 蓝图已更新。下面 4 条路任选其一，可以马上动手。</p>
+  <div class="opt-grid">
+    <div class="opt simplified">
+      <div class="opt-head"><span class="opt-num">A</span><h3 class="opt-title">冻结 JSON Schema v0.1</h3></div>
+      <p>把策划 001 的 JSON 草案正式化：Zod 校验 + TypeScript 类型 + 版本迁移规则。<strong>Week 1 入口</strong>，所有模块都依赖这个 schema。</p>
+    </div>
+    <div class="opt simplified">
+      <div class="opt-head"><span class="opt-num">B</span><h3 class="opt-title">R3F 单文件原型</h3></div>
+      <p>写一个可跑 demo：读 JSON → R3F 渲染 3D → TransformControls 拖拽 → Zustand 镜像。<strong>Week 1 入口</strong>，立刻看到导演看到的画面。</p>
+    </div>
+    <div class="opt simplified">
+      <div class="opt-head"><span class="opt-num">C</span><h3 class="opt-title">场景 Agent + 粗略视频</h3></div>
+      <p>5 个场景模板 + 6 运镜模板 + GPT-4o + MediaRecorder 录 mp4。<strong>Week 2 入口</strong>，跑通"剧本 → JSON → 粗略视频"完整本地闭环。</p>
+    </div>
+    <div class="opt simplified">
+      <div class="opt-head"><span class="opt-num">D</span><h3 class="opt-title">可灵 API 适配器</h3></div>
+      <p>写可灵 API HTTP 客户端（优先图生视频 / 视频参考模式），30 分钟跑通"mp4 + prompt → 可灵 → 最终视频"。<strong>Week 3 入口</strong>，验证闭环成立。</p>
+    </div>
+  </div>
+</section>
+
+<footer class="hero">
+  <p>蓝图 v2 · 商业 API 路线 · <span style="color:var(--accent)">3D 导演台</span> · 单 RGB 粗略视频参考 · 仅 Web 浏览器</p>
+</footer>
+
+</div>
+</body>
+</html>

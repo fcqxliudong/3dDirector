@@ -1,0 +1,21 @@
+{
+  "name": "director-stage-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "3D 导演台 · Monorepo (TS Schema + Web 前端 + PHP 后端)",
+  "workspaces": [
+    "packages/scene-schema",
+    "packages/web"
+  ],
+  "scripts": {
+    "build:schema": "npm run build --workspace=@director-stage/scene-schema",
+    "build:web": "npm run build --workspace=@director-stage/web",
+    "build": "npm run build:schema && npm run build:web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "dependencies": {
+    "three-stdlib": "^2.36.1",
+    "tsx": "^4.23.15"
+  }
+}

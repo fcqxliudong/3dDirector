@@ -5,11 +5,21 @@ import { useT } from '../i18n';
 
 export function RightPanel() {
   const t = useT();
-  const [tab, setTab] = useState<'console' | 'agent'>('console');
+  // 默认打开智能体；两面板都挂载，切 tab 只隐藏，避免对话历史被卸载清空
+  const [tab, setTab] = useState<'console' | 'agent'>('agent');
 
   return (
     <aside className="right-panel">
       <div className="right-tabs" role="tablist">
+        <button
+          className={`right-tab ${tab === 'agent' ? 'active' : ''}`}
+          role="tab"
+          aria-selected={tab === 'agent'}
+          onClick={() => setTab('agent')}
+        >
+          {t('tab.agent')}
+          {t('tab.agent.dev') ? <span className="badge-dev">{t('tab.agent.dev')}</span> : null}
+        </button>
         <button
           className={`right-tab ${tab === 'console' ? 'active' : ''}`}
           role="tab"
@@ -18,19 +28,15 @@ export function RightPanel() {
         >
           {t('tab.console')}
         </button>
-        <button
-          className={`right-tab ${tab === 'agent' ? 'active' : ''}`}
-          role="tab"
-          aria-selected={tab === 'agent'}
-          onClick={() => setTab('agent')}
-        >
-          {t('tab.agent')}
-          <span className="badge-dev">{t('tab.agent.dev')}</span>
-        </button>
       </div>
 
       <div className="right-tab-body">
-        {tab === 'console' ? <PropertiesPanel /> : <AgentPanel />}
+        <div className={`right-tab-pane right-tab-pane-agent${tab === 'agent' ? ' is-active' : ''}`} hidden={tab !== 'agent'}>
+          <AgentPanel />
+        </div>
+        <div className={`right-tab-pane right-tab-pane-console${tab === 'console' ? ' is-active' : ''}`} hidden={tab !== 'console'}>
+          <PropertiesPanel />
+        </div>
       </div>
 
       <style>{`
@@ -87,9 +93,26 @@ export function RightPanel() {
         .right-tab-body {
           flex: 1;
           min-height: 0;
-          overflow-y: auto;
+          overflow: hidden;
           display: flex;
           flex-direction: column;
+          position: relative;
+        }
+        .right-tab-pane {
+          flex: 1;
+          min-height: 0;
+          display: none;
+          flex-direction: column;
+          overflow: hidden;
+        }
+        .right-tab-pane.is-active {
+          display: flex;
+        }
+        .right-tab-pane[hidden] {
+          display: none !important;
+        }
+        .right-tab-pane-console.is-active {
+          overflow-y: auto;
         }
       `}</style>
     </aside>

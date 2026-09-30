@@ -111,7 +111,6 @@
   "scene.cancel": "✕",
   "scene.cancelTitle": "Discard · exit free mode",
   "scene.t": "t = {t}s",
-  "scene.hint": "Drag mouse to adjust · Esc to cancel",
   "cam.push_in": "Push",
   "cam.pull_out": "Pull",
   "cam.orbit": "Orbit",

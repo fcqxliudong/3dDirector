@@ -81,9 +81,6 @@ function ViewCaptureButtons() {
         </button>
       )}
       <span className="capture-meta">{t('scene.t', { t: previewT.toFixed(2) })}</span>
-      {freeViewMode && (
-        <div className="capture-hint">{t('scene.hint')}</div>
-      )}
     </div>
   );
 }
@@ -686,15 +683,16 @@ export function Timeline() {
           cursor: pointer; transition: all .15s ease;
         }
         .view-capture .capture-btn.save {
-          background: var(--accent);
-          color: var(--bg);
+          background: var(--danger);
+          color: white;
         }
         .view-capture .capture-btn:hover {
           transform: translateY(-1px);
           box-shadow: 0 2px 8px rgba(77,171,247,0.4);
         }
         .view-capture .capture-btn.save:hover {
-          box-shadow: 0 2px 8px rgba(92,255,142,0.5);
+          background: #b91c1c;
+          box-shadow: 0 2px 8px rgba(220,38,38,0.5);
         }
         .view-capture .cancel-btn {
           background: transparent; color: var(--muted);

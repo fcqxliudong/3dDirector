@@ -111,7 +111,6 @@
   "scene.cancel": "✕",
   "scene.cancelTitle": "不保存 · 退出自由模式",
   "scene.t": "t = {t}s",
-  "scene.hint": "拖鼠标调视角 · 按 Esc 取消",
   "cam.push_in": "推",
   "cam.pull_out": "拉",
   "cam.orbit": "环绕",

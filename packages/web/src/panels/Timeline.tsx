@@ -114,8 +114,6 @@ export function Timeline() {
    * 点 ⤢ 还原按钮会重置为 false
    */
   const [userZoomed, setUserZoomed] = useState(false);
-  // 当前可见时间范围（用于两端标签显示）
-  const [viewRange, setViewRange] = useState<{ start: number; end: number }>({ start: 0, end: scene.duration });
 
   // 关键帧拖动状态（独立于 track-rail 拖动）
   const dragKfRef = useRef<{
@@ -250,23 +248,8 @@ export function Timeline() {
     return () => ro.disconnect();
   }, [userZoomed, computeFitZoom]);
 
-  /** 监听滚动 · 更新 viewRange 用于两端时间标签 */
-  const handleScroll = () => {
-    const wrap = trackWrapRef.current;
-    const rail = trackRef.current;
-    if (!wrap || !rail) return;
-    const railWidth = rail.scrollWidth;
-    const visibleStart = (wrap.scrollLeft / railWidth) * scene.duration;
-    const visibleEnd = ((wrap.scrollLeft + wrap.clientWidth) / railWidth) * scene.duration;
-    setViewRange({
-      start: Math.max(0, Math.min(scene.duration, visibleStart)),
-      end: Math.max(0, Math.min(scene.duration, visibleEnd)),
-    });
-  };
-  useEffect(() => {
-    handleScroll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoom, scene.duration]);
+  // 注:已删除 viewRange state + handleScroll(view-range 标签去掉了,scroll listener 不再需要)
+  //   playhead 自动居中的 useEffect 见下方
 
   /**
    * playhead 始终可见：
@@ -336,11 +319,6 @@ export function Timeline() {
         </div>
         {/* 视角操作按钮组 · 推到 .timeline-controls 最右侧 */}
         <ViewCaptureButtons />
-        {/* 可见范围标签 · 挪到顶栏最末端(原在底部,被 Timeline 容器裁掉)
-            · 字号 10px + 灰色,跟缩放区视觉权重区分开 */}
-        <span className="view-range mono">
-          {t('timeline.viewRange', { a: viewRange.start.toFixed(1), b: viewRange.end.toFixed(1), total: scene.duration })}
-        </span>
       </div>
 
       <div className="timeline-track">
@@ -348,7 +326,6 @@ export function Timeline() {
         <div
           ref={trackWrapRef}
           className="track-wrap"
-          onScroll={handleScroll}
           onWheel={handleWheel}
         >
           <div
@@ -648,14 +625,6 @@ export function Timeline() {
         }
         .akf-dot {
           pointer-events: auto;
-        }
-        .view-range {
-          font-size: 10px; color: var(--muted);
-          white-space: nowrap;
-          padding-left: 10px;
-          margin-left: 4px;
-          border-left: 1px solid var(--line);
-          align-self: center;
         }
         .zoom-controls {
           display: flex; align-items: center; gap: 4px;

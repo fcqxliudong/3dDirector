@@ -49,7 +49,6 @@
   "timeline.zoomOut": "Zoom out timeline",
   "timeline.zoomIn": "Zoom in timeline",
   "timeline.zoomFit": "Reset zoom",
-  "timeline.viewRange": "View {a}s — {b}s / {total}s",
   "timeline.kfDotTitle": "Keyframe #{i} · t={t}s · click to jump · drag to move · dbl-click to delete",
   "timeline.deleteConfirm": "Delete keyframe #{i} (t={t}s)?",
   "timeline.minKfWarn": "Keep at least 2 keyframes",

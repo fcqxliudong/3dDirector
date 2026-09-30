@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 declare(strict_types=1);
 
 /**
@@ -11,7 +11,7 @@ declare(strict_types=1);
  * 返回：{ ok, result: { result: pass/warn/fail, issues: [...], summary } }
  */
 
-require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../../lib/auth.php';
 auth_boot();
 $u = require_login_api();
 session_write_close();

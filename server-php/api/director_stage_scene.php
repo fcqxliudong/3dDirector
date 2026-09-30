@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 declare(strict_types=1);
 
 /**
@@ -13,7 +13,7 @@ declare(strict_types=1);
  * 注意：所有操作按 owner_id 过滤 · 越权直接 403
  */
 
-require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../../lib/auth.php';
 auth_boot();
 $u = require_login_api();
 session_write_close();

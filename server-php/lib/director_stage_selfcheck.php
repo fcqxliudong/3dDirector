@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 declare(strict_types=1);
 
 /**
@@ -14,10 +14,10 @@ declare(strict_types=1);
 
 // 部署位置：/home/wwwroot/ai_video/3d/lib/
 // 复用 ai_video 的 lib/ → 走 ../lib/ 跨一级目录
-require_once __DIR__ . '/../lib/auth.php';
-require_once __DIR__ . '/../lib/db.php';
-require_once __DIR__ . '/../lib/llm_api.php';
-require_once __DIR__ . '/../lib/model_entries.php';
+require_once __DIR__ . '/../../lib/auth.php';
+require_once __DIR__ . '/../../lib/db.php';
+require_once __DIR__ . '/../../lib/llm_api.php';
+require_once __DIR__ . '/../../lib/model_entries.php';
 require_once __DIR__ . '/director_stage_schema.php';
 
 const DS_CHECK_PROMPT = <<<PROMPT

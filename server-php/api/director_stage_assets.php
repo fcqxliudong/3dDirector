@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 declare(strict_types=1);
 
 /**
@@ -8,7 +8,7 @@ declare(strict_types=1);
  * 用途：前端启动时一次拿全所有 UI 下拉数据
  */
 
-require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../../lib/auth.php';
 auth_boot();
 $u = require_login_api();
 session_write_close();

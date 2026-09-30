@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 declare(strict_types=1);
 
 /**
@@ -15,7 +15,7 @@ declare(strict_types=1);
  * - 失败透传 Zod 风格详细 issues
  */
 
-require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../../lib/auth.php';
 auth_boot();
 $u = require_login_api();
 session_write_close();

@@ -235,7 +235,7 @@ export function SceneViewer() {
         />
 
         {/* 环境几何体 */}
-        <EnvMesh preset={scene.scene.preset} size={scene.scene.size} />
+        <EnvMesh preset={scene.scene.preset} size={scene.scene.size} env={scene.scene.env} />
 
         {/* 角色胶囊 */}
         {scene.actors.map((actor) => (

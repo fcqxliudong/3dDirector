@@ -42,7 +42,8 @@ function matchRefToLabel(label: string, refs: PromptRef[]): PromptRef | null {
 
 /** 确定性拼阻塞摘要（不调 LLM） */
 export function buildDirectorStagePromptBlock(scene: SceneJSON, refs: PromptRef[] = []): string {
-  const preset = scene.scene?.preset || 'room_small';
+  const size = Array.isArray(scene.scene?.size) ? scene.scene.size : [];
+  const envN = Array.isArray(scene.scene?.env) ? scene.scene.env.length : 0;
   const duration = scene.duration || 0;
   const actors = Array.isArray(scene.actors) ? scene.actors : [];
   const kfs = Array.isArray(scene.camera?.keyframes) ? scene.camera.keyframes : [];
@@ -87,7 +88,7 @@ export function buildDirectorStagePromptBlock(scene: SceneJSON, refs: PromptRef[
 
   const lines = [
     DS_PROMPT_BLOCK_START,
-    `【3D阻塞】preset=${preset}；时长=${duration}s；比例=${scene.aspect || ''}`,
+    `【3D阻塞】空间=${size.length ? size.map((n) => Math.round(Number(n) * 10) / 10).join('×') : '?'}；env=${envN}；时长=${duration}s；比例=${scene.aspect || ''}`,
     `【角色】${actorLines.length ? actorLines.join('；') : '(无)'}`,
     '【绑定】',
     ...(bindLines.length ? bindLines : ['- (无参考绑定)']),

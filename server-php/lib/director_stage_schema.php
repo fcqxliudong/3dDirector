@@ -56,14 +56,17 @@ const DS_CAMERA_MOVE_TYPES = ['push_in', 'pull_out', 'orbit', 'crane_up', 'track
 // ─── Ease（4 个） ────────────────────────────────────────────────────────
 const DS_EASE_TYPES = ['linear', 'easeIn', 'easeOut', 'easeInOut'];
 
-// ─── 场景预设（5 个） ────────────────────────────────────────────────────
+// ─── 场景空间（open 为主；旧名仅兼容） ───────────────────────────────────
 const DS_SCENE_PRESETS = [
-    'room_small' => ['label' => '小房间', 'size' => [8, 3, 6]],
-    'corridor'   => ['label' => '走廊',   'size' => [4, 3, 20]],
-    'street'     => ['label' => '街道',    'size' => [12, 6, 30]],
-    'forest'     => ['label' => '森林',    'size' => [40, 8, 40]],
-    'space'      => ['label' => '太空',    'size' => [20, 12, 40]],
+    'open'       => ['label' => '开放空间', 'size' => [24, 3, 24]],
+    'room_small' => ['label' => '小房间(旧)', 'size' => [8, 3, 6]],
+    'corridor'   => ['label' => '走廊(旧)',   'size' => [4, 3, 20]],
+    'street'     => ['label' => '街道(旧)',    'size' => [12, 6, 30]],
+    'forest'     => ['label' => '森林(旧)',    'size' => [40, 8, 40]],
+    'space'      => ['label' => '太空(旧)',    'size' => [20, 12, 40]],
 ];
+
+const DS_ENV_KINDS = ['ground', 'box', 'cyl', 'cone', 'wall'];
 
 // ─── 限制常量 ────────────────────────────────────────────────────────────
 const DS_SCENE_LIMITS = [
@@ -77,24 +80,36 @@ const DS_SCENE_LIMITS = [
 /**
  * 创建空场景（与 TS emptyScene() 一一对应）
  */
-function ds_empty_scene(string $preset = 'room_small'): array
+function ds_empty_scene(string $preset = 'open'): array
 {
     if (!isset(DS_SCENE_PRESETS[$preset])) {
-        $preset = 'room_small';
+        $preset = 'open';
     }
     $info = DS_SCENE_PRESETS[$preset];
+    $size = $info['size'];
+    $w = (float)$size[0];
+    $d = (float)$size[2];
     return [
         'version'  => DS_SCHEMA_VERSION,
         'scene'    => [
-            'preset' => $preset,
-            'size'   => $info['size'],
+            'preset' => 'open',
+            'size'   => $size,
+            'env'    => [
+                [
+                    'id' => 'ground',
+                    'kind' => 'ground',
+                    'pos' => [0, 0, 0],
+                    'size' => [$w, 0.08, $d],
+                    'color' => '#6a7360',
+                ],
+            ],
         ],
         'actors'   => [],
         'camera'   => [
             'fov'       => 35,
             'keyframes' => [
-                ['t' => 0, 'pos' => [0, 1.6, 6],  'lookAt' => [0, 1.5, 0]],
-                ['t' => 5, 'pos' => [0, 1.5, 3],  'lookAt' => [0, 1.5, 0], 'ease' => 'easeInOut'],
+                ['t' => 0, 'pos' => [0, 1.6, max(6.0, $d * 0.35)],  'lookAt' => [0, 1.5, 0]],
+                ['t' => 5, 'pos' => [0, 1.5, max(3.0, $d * 0.2)],  'lookAt' => [0, 1.5, 0], 'ease' => 'easeInOut'],
             ],
         ],
         'duration' => 5,
@@ -129,7 +144,7 @@ function ds_validate_scene(mixed $input): array
     } else {
         $preset = $input['scene']['preset'] ?? null;
         if (!is_string($preset) || !isset(DS_SCENE_PRESETS[$preset])) {
-            $errors[] = ['path' => 'scene.preset', 'message' => 'scene.preset 必须是 5 个预设之一'];
+            $errors[] = ['path' => 'scene.preset', 'message' => 'scene.preset 非法'];
         }
         $size = $input['scene']['size'] ?? null;
         if (!ds_is_vec3($size)) {
@@ -138,6 +153,34 @@ function ds_validate_scene(mixed $input): array
             foreach ($size as $i => $v) {
                 if ($v <= 0) {
                     $errors[] = ['path' => "scene.size[$i]", 'message' => "scene.size[$i] 必须 > 0"];
+                }
+            }
+        }
+        if (isset($input['scene']['env'])) {
+            $env = $input['scene']['env'];
+            if (!is_array($env)) {
+                $errors[] = ['path' => 'scene.env', 'message' => 'scene.env 必须是数组'];
+            } elseif (count($env) > 40) {
+                $errors[] = ['path' => 'scene.env', 'message' => 'scene.env 最多 40 项'];
+            } else {
+                foreach ($env as $ei => $ep) {
+                    if (!is_array($ep)) {
+                        $errors[] = ['path' => "scene.env[$ei]", 'message' => 'env 项必须是对象'];
+                        continue;
+                    }
+                    $kind = $ep['kind'] ?? '';
+                    if (!is_string($kind) || !in_array($kind, DS_ENV_KINDS, true)) {
+                        $errors[] = ['path' => "scene.env[$ei].kind", 'message' => 'env.kind 非法'];
+                    }
+                    if (!isset($ep['id']) || !is_string($ep['id']) || $ep['id'] === '') {
+                        $errors[] = ['path' => "scene.env[$ei].id", 'message' => 'env.id 必填'];
+                    }
+                    if (!ds_is_vec3($ep['pos'] ?? null)) {
+                        $errors[] = ['path' => "scene.env[$ei].pos", 'message' => 'env.pos 必须是 vec3'];
+                    }
+                    if (!ds_is_vec3($ep['size'] ?? null)) {
+                        $errors[] = ['path' => "scene.env[$ei].size", 'message' => 'env.size 必须是 vec3'];
+                    }
                 }
             }
         }

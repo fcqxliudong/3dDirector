@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useSceneStore, PRESET_LIST } from '../store/scene';
-import type { ScenePreset, AspectRatio, Actor } from '@director-stage/scene-schema';
+import { useSceneStore } from '../store/scene';
+import type { AspectRatio, Actor } from '@director-stage/scene-schema';
 import { useT } from '../i18n';
 
 const COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c'];
@@ -19,7 +19,7 @@ export function Sidebar() {
   const scene = useSceneStore((s) => s.scene);
   const selectedId = useSceneStore((s) => s.selectedId);
   const select = useSceneStore((s) => s.select);
-  const setPreset = useSceneStore((s) => s.setPreset);
+  const setSceneSize = useSceneStore((s) => s.setSceneSize);
   const setAspect = useSceneStore((s) => s.setAspect);
   const addActor = useSceneStore((s) => s.addActor);
   const removeActor = useSceneStore((s) => s.removeActor);
@@ -41,16 +41,32 @@ export function Sidebar() {
     select(newActor.id);
   };
 
+  const [w, h, d] = scene.scene.size;
+
   return (
     <aside className="sidebar">
-      <Section title={t('sidebar.preset')}>
-        <select value={scene.scene.preset} onChange={(e) => setPreset(e.target.value as ScenePreset)}>
-          {PRESET_LIST.map((p) => (
-            <option key={p.id} value={p.id}>
-              {t(`preset.${p.id}`)} ({p.size[0]}×{p.size[1]}×{p.size[2]})
-            </option>
-          ))}
-        </select>
+      <Section title={t('sidebar.space')}>
+        <div className="size-row">
+          <label>W</label>
+          <input
+            type="number"
+            min={2}
+            max={80}
+            step={1}
+            value={Math.round(w)}
+            onChange={(e) => setSceneSize([parseFloat(e.target.value) || 24, h, d])}
+          />
+          <label>D</label>
+          <input
+            type="number"
+            min={2}
+            max={80}
+            step={1}
+            value={Math.round(d)}
+            onChange={(e) => setSceneSize([w, h, parseFloat(e.target.value) || 24])}
+          />
+        </div>
+        <div className="size-hint">{t('sidebar.spaceHint')}</div>
       </Section>
 
       <Section title={t('sidebar.aspect')}>
@@ -203,6 +219,27 @@ export function Sidebar() {
           font-family: 'JetBrains Mono', monospace;
         }
         .slider-row input[type="range"] { width: 100%; }
+        .size-row {
+          display: grid;
+          grid-template-columns: 18px 1fr 18px 1fr;
+          gap: 6px;
+          align-items: center;
+        }
+        .size-row label {
+          font-size: 11px; font-weight: 600; color: var(--muted);
+          font-family: 'JetBrains Mono', monospace;
+        }
+        .size-row input {
+          width: 100%;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 12px;
+        }
+        .size-hint {
+          margin-top: 6px;
+          font-size: 11px;
+          color: var(--muted);
+          line-height: 1.4;
+        }
       `}</style>
     </aside>
   );

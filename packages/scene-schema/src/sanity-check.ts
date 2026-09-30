@@ -55,7 +55,7 @@ expectSuccess('examples/corridor.json 合法', corridor);
 // ─── 2. 工厂函数 ──────────────────────────────────────
 console.log('\n[2] emptyScene() 工厂函数');
 
-for (const preset of ['room_small', 'corridor', 'street', 'forest', 'space'] as const) {
+for (const preset of ['open', 'room_small', 'corridor', 'street', 'forest', 'space'] as const) {
   const s = emptyScene(preset);
   expectSuccess(`emptyScene("${preset}") 合法`, s);
 }

@@ -32,7 +32,7 @@ export interface ToolApplyResult {
 
 const ASPECTS = new Set(['2.76:1', '2.39:1', '2.00:1', '1.85:1', '16:9', '4:3', '9:16', '1:1']);
 const POSES = new Set(['stand', 'walk', 'run', 'sit', 'crouch', 'idle']);
-const PRESETS = new Set(['room_small', 'corridor', 'street', 'forest', 'space']);
+const PRESETS = new Set(['open', 'room_small', 'corridor', 'street', 'forest', 'space']);
 const EASES = new Set(['linear', 'easeIn', 'easeOut', 'easeInOut']);
 const CAM_PRESETS = new Set(['push_in', 'pull_out', 'orbit', 'crane_up', 'tracking', 'static']);
 const FPS = new Set([24, 30, 60]);
@@ -84,10 +84,43 @@ function applyOne(name: string, args: Record<string, unknown>): { ok: boolean; s
 
   switch (name) {
     case 'set_preset': {
-      const preset = String(args.preset || '');
-      if (!PRESETS.has(preset)) return { ok: false, summary: '', error: '非法 preset' };
-      store.setPreset(preset as ScenePreset);
-      return { ok: true, summary: `场景预设 → ${preset}` };
+      // 兼容旧工具：只取尺寸，落到 open 地面
+      const preset = String(args.preset || 'open');
+      store.setPreset((PRESETS.has(preset) ? preset : 'open') as ScenePreset);
+      return { ok: true, summary: `空间尺寸（兼容 preset）→ ${preset}` };
+    }
+    case 'set_scene_size': {
+      const size = asVec3(args.size);
+      if (!size) return { ok: false, summary: '', error: 'size 必须是 [w,h,d]' };
+      store.setSceneSize(size);
+      return { ok: true, summary: `空间尺寸 → [${size.map((n) => Math.round(n * 10) / 10).join(', ')}]` };
+    }
+    case 'set_env': {
+      const raw = args.env;
+      if (!Array.isArray(raw)) return { ok: false, summary: '', error: 'env 必须是数组' };
+      const env: import('@director-stage/scene-schema').EnvProp[] = [];
+      for (const item of raw.slice(0, 40)) {
+        if (!item || typeof item !== 'object') continue;
+        const o = item as Record<string, unknown>;
+        const id = String(o.id || '').trim();
+        const kind = String(o.kind || 'box');
+        if (!id) continue;
+        if (!['ground', 'box', 'cyl', 'cone', 'wall'].includes(kind)) continue;
+        const pos = asVec3(o.pos) || [0, 0, 0];
+        const size = asVec3(o.size) || [1, 1, 1];
+        const color = asHex(o.color) || undefined;
+        const rot = asVec3(o.rot) || undefined;
+        env.push({
+          id,
+          kind: kind as 'ground' | 'box' | 'cyl' | 'cone' | 'wall',
+          pos,
+          size,
+          ...(color ? { color } : {}),
+          ...(rot ? { rot } : {}),
+        });
+      }
+      store.setEnv(env);
+      return { ok: true, summary: `环境几何 → ${env.length} 件（无天花板）` };
     }
     case 'set_aspect': {
       const aspect = String(args.aspect || '');

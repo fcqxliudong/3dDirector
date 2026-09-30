@@ -26,9 +26,10 @@ import {
   type ActorPose,
   type ScenePreset,
   type AspectRatio,
+  type EnvProp,
 } from '@director-stage/scene-schema';
 
-export type { SceneJSON, Actor, CameraKeyframe, Vec3, ActorPose, ScenePreset, AspectRatio };
+export type { SceneJSON, Actor, CameraKeyframe, Vec3, ActorPose, ScenePreset, AspectRatio, EnvProp };
 
 interface SceneState {
   scene: SceneJSON;
@@ -55,6 +56,8 @@ interface SceneState {
   loadJson: (raw: string) => boolean;
 
   setPreset: (preset: ScenePreset) => void;
+  setSceneSize: (size: Vec3) => void;
+  setEnv: (env: EnvProp[]) => void;
   setAspect: (aspect: AspectRatio) => void;
   setDuration: (d: number) => void;
 
@@ -90,7 +93,7 @@ export interface CameraPresetOptions {
 }
 
 export const useSceneStore = create<SceneState>((set, get) => ({
-  scene: emptyScene('room_small'),
+  scene: emptyScene('open'),
   selectedId: null,
   previewT: 0,
   playing: false,
@@ -99,7 +102,11 @@ export const useSceneStore = create<SceneState>((set, get) => ({
   freeViewMode: false,
 
   init: (preset) => {
-    const s = emptyScene(preset);
+    const s = emptyScene(preset === 'open' ? 'open' : preset);
+    // 统一落到 open + 默认地面
+    if (s.scene.preset !== 'open') {
+      s.scene = { ...s.scene, preset: 'open' };
+    }
     set({ scene: s, selectedId: null, previewT: 0, playing: false, errors: [] });
   },
 
@@ -128,10 +135,69 @@ export const useSceneStore = create<SceneState>((set, get) => ({
   },
 
   setPreset: (preset) => {
+    // 旧接口：只借预设的默认尺寸，几何一律 open + 地面
     set((st) => {
-      const size = SCENE_PRESET_INFO[preset].size;
-      return { scene: { ...st.scene, scene: { preset, size } } };
+      const info = SCENE_PRESET_INFO[preset] ?? SCENE_PRESET_INFO.open;
+      const [w, , d] = info.size;
+      return {
+        scene: {
+          ...st.scene,
+          scene: {
+            preset: 'open',
+            size: info.size,
+            env: [
+              {
+                id: 'ground',
+                kind: 'ground',
+                pos: [0, 0, 0],
+                size: [w, 0.08, d],
+                color: '#6a7360',
+              },
+            ],
+          },
+        },
+      };
     });
+  },
+
+  setSceneSize: (size) => {
+    set((st) => {
+      const w = Math.max(2, Number(size[0]) || 24);
+      const h = Math.max(1, Number(size[1]) || 3);
+      const d = Math.max(2, Number(size[2]) || 24);
+      const env = Array.isArray(st.scene.scene.env) ? [...st.scene.scene.env] : [];
+      const gi = env.findIndex((e) => e.kind === 'ground');
+      if (gi >= 0) {
+        env[gi] = { ...env[gi], size: [w, Math.max(0.04, env[gi].size?.[1] || 0.08), d] };
+      } else {
+        env.unshift({
+          id: 'ground',
+          kind: 'ground',
+          pos: [0, 0, 0],
+          size: [w, 0.08, d],
+          color: '#6a7360',
+        });
+      }
+      return {
+        scene: {
+          ...st.scene,
+          scene: { ...st.scene.scene, preset: 'open', size: [w, h, d], env },
+        },
+      };
+    });
+  },
+
+  setEnv: (env) => {
+    set((st) => ({
+      scene: {
+        ...st.scene,
+        scene: {
+          ...st.scene.scene,
+          preset: 'open',
+          env: Array.isArray(env) ? env.slice(0, 40) : [],
+        },
+      },
+    }));
   },
 
   setAspect: (aspect) => {

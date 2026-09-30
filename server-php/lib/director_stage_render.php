@@ -19,10 +19,10 @@ declare(strict_types=1);
 
 // 部署位置：/home/wwwroot/ai_video/3d/lib/
 // 复用 ai_video 的 lib/ → 走 ../lib/ 跨一级目录
-require_once __DIR__ . '/../lib/auth.php';
-require_once __DIR__ . '/../lib/db.php';
-require_once __DIR__ . '/../lib/llm_api.php';
-require_once __DIR__ . '/../lib/model_entries.php';
+require_once __DIR__ . '/../../lib/auth.php';
+require_once __DIR__ . '/../../lib/db.php';
+require_once __DIR__ . '/../../lib/llm_api.php';
+require_once __DIR__ . '/../../lib/model_entries.php';
 require_once __DIR__ . '/director_stage_schema.php';
 
 /**
@@ -39,14 +39,15 @@ function ds_render_derive_prompt(array $scene): string
 
     // 1. 场景描述
     $presetLabels = [
+        'open' => 'open ground stage',
         'room_small' => 'small room',
         'corridor'   => 'corridor',
         'street'     => 'street',
         'forest'     => 'forest',
         'space'      => 'sci-fi space environment',
     ];
-    $preset = $scene['scene']['preset'] ?? 'room_small';
-    $parts[] = $presetLabels[$preset] ?? 'scene';
+    $preset = $scene['scene']['preset'] ?? 'open';
+    $parts[] = $presetLabels[$preset] ?? 'open stage';
 
     // 2. 角色描述
     foreach ($scene['actors'] ?? [] as $a) {

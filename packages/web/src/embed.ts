@@ -315,7 +315,7 @@ export async function bootDirectorStage(): Promise<void> {
     }
   }
   if (!loaded) {
-    store.init('room_small');
+    store.init('open');
     store.setDuration(state.duration);
     if (isAspect(state.aspect)) store.setAspect(state.aspect);
   }

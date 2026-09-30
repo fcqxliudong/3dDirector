@@ -115,28 +115,35 @@ export const EASE_TYPES = [
 
 export type EaseType = (typeof EASE_TYPES)[number];
 
-// ─── 场景预设（5 个 · Week 2 实现） ─────────────────
+// ─── 场景空间（open = 智能体自建；旧 preset 名仅兼容旧 JSON） ───
 export const SCENE_PRESETS = [
-  'room_small',     // 小房间（4x3x3 米）
-  'corridor',       // 走廊（4x3x20 米）
-  'street',         // 街道
-  'forest',         // 森林
-  'space',          // 太空 / 科幻
+  'open',           // 开放地面 · 默认；几何由 scene.env 描述
+  'room_small',     // 兼容旧数据
+  'corridor',
+  'street',
+  'forest',
+  'space',
 ] as const;
 
 export type ScenePreset = (typeof SCENE_PRESETS)[number];
 
 export const SCENE_PRESET_INFO: Record<ScenePreset, { label: string; size: [number, number, number] }> = {
-  room_small: { label: '小房间', size: [8, 3, 6] },
-  'corridor': { label: '走廊',   size: [4, 3, 20] },
-  street:    { label: '街道',    size: [12, 6, 30] },
-  forest:    { label: '森林',    size: [40, 8, 40] },
-  space:     { label: '太空',    size: [20, 12, 40] },
+  open:      { label: '开放空间', size: [24, 3, 24] },
+  room_small: { label: '小房间(旧)', size: [8, 3, 6] },
+  corridor:  { label: '走廊(旧)',   size: [4, 3, 20] },
+  street:    { label: '街道(旧)',    size: [12, 6, 30] },
+  forest:    { label: '森林(旧)',    size: [40, 8, 40] },
+  space:     { label: '太空(旧)',    size: [20, 12, 40] },
 };
+
+/** 环境几何（智能体自建 · 一般只要地面+少量墙/道具，不要天花板） */
+export const ENV_KINDS = ['ground', 'box', 'cyl', 'cone', 'wall'] as const;
+export type EnvKind = (typeof ENV_KINDS)[number];
 
 // ─── 约束检查快捷常量 ────────────────────────────────
 export const SCENE_LIMITS = {
   ACTORS_MAX: 10,           // 单场景最多 10 个角色
+  ENV_PROPS_MAX: 40,        // 环境几何上限
   CAMERA_KEYFRAMES_MIN: 2,  // 至少 2 个关键帧（起始 + 结束）
   CAMERA_KEYFRAMES_MAX: 20, // 最多 20 个（运镜编辑上限）
   CAMERA_FOV_MIN: 10,       // 广角端

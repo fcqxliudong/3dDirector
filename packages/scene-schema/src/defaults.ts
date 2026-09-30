@@ -24,16 +24,27 @@ import type { SceneJSON } from './types.js';
  * - 调用方不传 duration → 默认 10s（旧调用方 zero-cost 兼容）
  */
 export function emptyScene(
-  preset: keyof typeof SCENE_PRESET_INFO = 'room_small',
+  preset: keyof typeof SCENE_PRESET_INFO = 'open',
   durationOpt?: number,
 ): SceneJSON {
-  const info = SCENE_PRESET_INFO[preset];
+  const info = SCENE_PRESET_INFO[preset] ?? SCENE_PRESET_INFO.open;
   const duration = durationOpt ?? 10;
+  const [w, , d] = info.size;
   return {
     version: SCHEMA_VERSION,
     scene: {
-      preset,
+      preset: 'open',
       size: info.size,
+      // 默认一片地面，智能体可再加墙/道具
+      env: [
+        {
+          id: 'ground',
+          kind: 'ground',
+          pos: [0, 0, 0],
+          size: [w, 0.08, d],
+          color: '#6a7360',
+        },
+      ],
     },
     actors: [],
     camera: {
@@ -41,12 +52,12 @@ export function emptyScene(
       keyframes: [
         {
           t: 0,
-          pos: [0, 1.6, 6],
+          pos: [0, 1.6, Math.max(6, d * 0.35)],
           lookAt: [0, 1.5, 0],
         },
         {
           t: duration,
-          pos: [0, 1.5, 3],
+          pos: [0, 1.5, Math.max(3, d * 0.2)],
           lookAt: [0, 1.5, 0],
           ease: 'easeInOut',
         },

@@ -92,7 +92,7 @@ function shadeHex(hex: string, factor: number): string {
   return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
 }
 
-/** 步态参数：按 pose；静止时 gait=0 */
+/** 步态：仅位移中摆腿；静止 pose 只改体态不迈步 */
 function gaitParams(pose: string, moving: boolean): {
   gait: number;
   freq: number;
@@ -110,7 +110,11 @@ function gaitParams(pose: string, moving: boolean): {
     return { gait: 0, freq: 0, legAmp: 0, armAmp: 0, bob: 0, bodyY: 0.72, baseY: 0.05, lean: 0.12 };
   }
 
-  // run：明示跑步；walk / 或位移中：走路摆臂（stand 有 moves 也会走）
+  if (!moving) {
+    return { gait: 0, freq: 0, legAmp: 0, armAmp: 0, bob: 0, bodyY: 1, baseY: 0, lean: 0 };
+  }
+
+  // 正在移动：按 pose 选走/跑摆幅
   if (pose === 'run') {
     return {
       gait: 1,
@@ -124,20 +128,16 @@ function gaitParams(pose: string, moving: boolean): {
     };
   }
 
-  if (pose === 'walk' || moving) {
-    return {
-      gait: 1,
-      freq: 1.7,
-      legAmp: 0.55,
-      armAmp: 0.5,
-      bob: 0.025,
-      bodyY: 1,
-      baseY: 0,
-      lean: 0.08,
-    };
-  }
-
-  return { gait: 0, freq: 0, legAmp: 0, armAmp: 0, bob: 0, bodyY: 1, baseY: 0, lean: 0 };
+  return {
+    gait: 1,
+    freq: 1.7,
+    legAmp: 0.55,
+    armAmp: 0.5,
+    bob: 0.025,
+    bodyY: 1,
+    baseY: 0,
+    lean: 0.08,
+  };
 }
 
 export function ActorMesh({ actor, selected, onClick }: Props) {
@@ -149,9 +149,8 @@ export function ActorMesh({ actor, selected, onClick }: Props) {
   const lLegRef = useRef<Group>(null);
   const rLegRef = useRef<Group>(null);
   const phaseRef = useRef(0);
-  const lastTRef = useRef(-1);
 
-  useFrame((_, delta) => {
+  useFrame(() => {
     if (!rootRef.current) return;
     const t = useSceneStore.getState().previewT;
     const { pos, pose, moving, moveDir, traveled } = evalActorPos(actor, t);
@@ -172,22 +171,12 @@ export function ActorMesh({ actor, selected, onClick }: Props) {
       bodyRef.current.position.y = gp.baseY;
     }
 
-    // 相位：优先用路程（步幅稳定）， scrub 时间轴也能对上；无位移时用时间
-    if (gp.gait > 0) {
-      if (moving) {
-        phaseRef.current = traveled * gp.freq * Math.PI * 2 * 0.55;
-      } else {
-        // pose=walk/run 但停在原地：轻步态（预览姿态）
-        if (lastTRef.current >= 0 && Math.abs(t - lastTRef.current) < 0.5) {
-          phaseRef.current += delta * gp.freq * Math.PI * 2;
-        } else {
-          phaseRef.current = t * gp.freq * Math.PI * 2;
-        }
-      }
+    // 仅位移中按路程摆腿；停下立刻直立
+    if (moving && gp.gait > 0) {
+      phaseRef.current = traveled * gp.freq * Math.PI * 2 * 0.55;
     } else {
-      phaseRef.current *= 0.85;
+      phaseRef.current = 0;
     }
-    lastTRef.current = t;
 
     const swing = Math.sin(phaseRef.current) * gp.gait;
     const bob = Math.abs(Math.sin(phaseRef.current * 2)) * gp.bob * gp.gait;

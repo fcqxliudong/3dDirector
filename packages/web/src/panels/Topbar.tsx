@@ -110,7 +110,7 @@ export function Topbar() {
       <div className="topbar-left">
         <span className="brand">🎬 Director Stage</span>
         <span className="brand-meta">
-          v0.1 · {scene.scene.preset}
+          v0.1 · {scene.scene.size.map((n) => Math.round(n)).join('×')}m
           {hasNode ? ` · #${embedState.nodeId}` : ''}
         </span>
       </div>

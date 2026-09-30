@@ -79,11 +79,22 @@ export interface Camera {
 }
 
 // ─── Scene Settings ───────────────────────────────────
-export interface SceneSettings {
-  /** 场景预设 · 决定默认几何布局 */
-  preset: ScenePreset;
-  /** 包围盒尺寸 [宽, 高, 深]（米） */
+export interface EnvProp {
+  id: string;
+  kind: 'ground' | 'box' | 'cyl' | 'cone' | 'wall';
+  pos: Vec3;
   size: Vec3;
+  color?: string;
+  rot?: Vec3;
+}
+
+export interface SceneSettings {
+  /** 兼容字段；渲染按 size + env，不再套模板房间 */
+  preset: ScenePreset;
+  /** 包围盒尺寸 [宽, 高, 深]（米）· 主要影响地面范围 */
+  size: Vec3;
+  /** 智能体自建环境几何（地面/墙/道具）；一般不要天花板 */
+  env?: EnvProp[];
 }
 
 // ─── 顶层 ─────────────────────────────────────────────

@@ -101,13 +101,31 @@ const CameraSchema = z
       ),
   });
 
+// ─── Env prop（开放空间几何） ─────────────────────────
+const EnvPropSchema = z.object({
+  id: z.string().min(1).max(32),
+  kind: z.enum(['ground', 'box', 'cyl', 'cone', 'wall']),
+  pos: Vec3Schema,
+  size: Vec3Schema.refine(
+    ([w, h, d]) => w > 0 && h > 0 && d > 0,
+    { message: 'env.size 三维必须 > 0' },
+  ),
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, 'color 必须是 #RRGGBB')
+    .optional(),
+  rot: Vec3Schema.optional(),
+});
+
 // ─── Scene Settings ───────────────────────────────────
 const SceneSettingsSchema = z.object({
+  /** 兼容字段；渲染不再套模板，统一按 size + env */
   preset: z.enum(SCENE_PRESETS),
   size: Vec3Schema.refine(
     ([w, h, d]) => w > 0 && h > 0 && d > 0,
     { message: 'scene.size 三维必须 > 0' },
   ),
+  env: z.array(EnvPropSchema).max(SCENE_LIMITS.ENV_PROPS_MAX).optional(),
 });
 
 // ─── 顶层 SceneJSON ───────────────────────────────────
@@ -167,6 +185,7 @@ export const SceneJSONLooseSchema = z.object({
     .object({
       preset: z.string(),
       size: z.array(z.number()),
+      env: z.array(z.object({}).passthrough()).optional(),
     })
     .passthrough(),
   actors: z.array(z.object({}).passthrough()),

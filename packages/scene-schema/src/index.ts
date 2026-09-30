@@ -31,6 +31,7 @@ export type {
   Actor,
   CameraKeyframe,
   Camera,
+  EnvProp,
   SceneSettings,
   SceneJSON,
   SceneJSONInput,

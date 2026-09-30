@@ -1,7 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSceneStore } from '../store/scene';
 import { ExportDialog } from './ExportDialog';
-import { notifyParent, readEmbed } from '../embed';
+import {
+  cancelBuildFromNode,
+  notifyParent,
+  readEmbed,
+  rebuildFromNode,
+  requestPickSaveNode,
+  saveEmbedScene,
+} from '../embed';
 import { useT, useLang, type Lang } from '../i18n';
 
 export function Topbar() {
@@ -14,19 +21,98 @@ export function Topbar() {
   const [lang, setLang] = useLang();
 
   const [exportOpen, setExportOpen] = useState(false);
-  const embed = readEmbed().embed;
+  const [embedState, setEmbedState] = useState(() => readEmbed());
   const [showJson, setShowJson] = useState(false);
   const [jsonText, setJsonText] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
+  const [buildMsg, setBuildMsg] = useState('');
+
+  useEffect(() => {
+    const sync = () => setEmbedState({ ...readEmbed() });
+    window.addEventListener('ds-embed-changed', sync);
+    const onCancel = () => {
+      setSaving(false);
+      setSaveMsg('');
+    };
+    window.addEventListener('ds-save-pick-cancel', onCancel);
+    const onBuild = (ev: Event) => {
+      const d = (ev as CustomEvent).detail || {};
+      if (d.phase === 'start') {
+        setBuildMsg(t('topbar.building'));
+        setEmbedState({ ...readEmbed() });
+        return;
+      }
+      if (d.phase === 'done') {
+        setEmbedState({ ...readEmbed() });
+        if (d.ok) {
+          setBuildMsg(String(d.reply || t('topbar.buildOk')).slice(0, 180));
+        } else {
+          setBuildMsg(String(d.error || t('topbar.buildFail')));
+        }
+        window.setTimeout(() => setBuildMsg(''), 5000);
+      }
+    };
+    window.addEventListener('ds-build-status', onBuild);
+    return () => {
+      window.removeEventListener('ds-embed-changed', sync);
+      window.removeEventListener('ds-save-pick-cancel', onCancel);
+      window.removeEventListener('ds-build-status', onBuild);
+    };
+  }, [t]);
+
+  const embed = embedState.embed;
+  const hasNode = embed && embedState.nodeId > 0;
+  const building = !!embedState.building;
 
   const copyJson = () => {
     navigator.clipboard?.writeText(toJson());
+  };
+
+  const handleSave = async () => {
+    if (!embed || saving) return;
+    setSaveMsg('');
+    if (!hasNode) {
+      setSaving(true);
+      requestPickSaveNode();
+      return;
+    }
+    setSaving(true);
+    try {
+      const r = await saveEmbedScene();
+      if (!r.ok) {
+        setSaveMsg(r.error || t('topbar.saveFail'));
+      } else {
+        setSaveMsg(t('topbar.saved'));
+        window.setTimeout(() => setSaveMsg(''), 1800);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (hasNode && saving) {
+      setSaving(false);
+      setSaveMsg(t('topbar.saved'));
+      window.setTimeout(() => setSaveMsg(''), 1800);
+    }
+  }, [hasNode, saving, t]);
+
+  const handleRebuild = () => {
+    if (!hasNode || building) return;
+    if (!window.confirm(t('topbar.rebuildConfirm'))) return;
+    rebuildFromNode();
   };
 
   return (
     <div className="topbar">
       <div className="topbar-left">
         <span className="brand">🎬 Director Stage</span>
-        <span className="brand-meta">v0.1 · {scene.scene.preset}</span>
+        <span className="brand-meta">
+          v0.1 · {scene.scene.preset}
+          {hasNode ? ` · #${embedState.nodeId}` : ''}
+        </span>
       </div>
 
       <div className="topbar-mid">
@@ -35,12 +121,44 @@ export function Topbar() {
             {t('topbar.errors', { n: errors.length })}
           </span>
         )}
+        {saveMsg && <span className="save-toast">{saveMsg}</span>}
+        {buildMsg && <span className="build-toast">{buildMsg}</span>}
       </div>
 
       <div className="topbar-right">
         {embed && (
-          <button type="button" onClick={() => notifyParent('close')} title="回到节点">
-            返回节点
+          <button
+            type="button"
+            onClick={() => notifyParent('close')}
+            title={hasNode ? t('topbar.backNodeTitle') : t('topbar.closeTitle')}
+          >
+            {hasNode ? t('topbar.backNode') : t('topbar.close')}
+          </button>
+        )}
+        {hasNode && (
+          <button
+            type="button"
+            onClick={handleRebuild}
+            disabled={building}
+            title={t('topbar.rebuildTitle')}
+          >
+            {building ? t('topbar.building') : t('topbar.rebuild')}
+          </button>
+        )}
+        {building && (
+          <button type="button" onClick={() => cancelBuildFromNode()} title={t('topbar.cancelBuild')}>
+            {t('topbar.cancelBuild')}
+          </button>
+        )}
+        {embed && (
+          <button
+            type="button"
+            className="primary"
+            onClick={() => void handleSave()}
+            disabled={saving || building}
+            title={hasNode ? t('topbar.saveTitle') : t('topbar.savePickTitle')}
+          >
+            {saving && !hasNode ? t('topbar.savingPick') : t('topbar.save')}
           </button>
         )}
         <button onClick={() => setShowJson((s) => !s)} title="查看 / 粘贴 JSON">
@@ -49,7 +167,7 @@ export function Topbar() {
         <button onClick={copyJson} title="复制当前 SceneJSON">
           {t('topbar.copy')}
         </button>
-        <button className="primary" onClick={() => setExportOpen(true)}>
+        <button className="primary" onClick={() => setExportOpen(true)} disabled={building}>
           {t('topbar.export')}
         </button>
         <select
@@ -101,11 +219,16 @@ export function Topbar() {
           position: relative;
         }
         .topbar-left { display: flex; align-items: center; gap: 12px; }
-        .topbar-mid { display: flex; align-items: center; gap: 12px; justify-self: center; }
-        .topbar-right { display: flex; align-items: center; gap: 8px; justify-self: end; }
+        .topbar-mid { display: flex; align-items: center; gap: 12px; justify-self: center; max-width: 42vw; }
+        .topbar-right { display: flex; align-items: center; gap: 8px; justify-self: end; flex-wrap: wrap; }
         .brand { font-family: 'DM Serif Display', serif; font-size: 18px; }
         .brand-meta { color: var(--muted); font-size: 12px; }
         .error-badge { color: var(--warn); background: #f3e1de; padding: 2px 8px; border-radius: 4px; font-size: 11.5px; cursor: help; }
+        .save-toast { color: #1a7f4b; background: #e4f6ec; padding: 2px 8px; border-radius: 4px; font-size: 11.5px; }
+        .build-toast {
+          color: #1e3a5f; background: #e8f0fa; padding: 2px 8px; border-radius: 4px;
+          font-size: 11.5px; max-width: 36vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
         .json-popup {
           position: absolute; top: 44px; right: 16px;
           width: 480px; max-width: 90vw;

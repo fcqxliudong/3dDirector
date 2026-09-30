@@ -3,19 +3,15 @@
  *
  * 流程：
  * 1. 找 R3F canvas（通过 window.__ds_canvas_wrap__ 引用）
- * 2. canvas.captureStream(fps) 拿 MediaStream
- * 3. MediaRecorder 录 WebM
- * 4. 期间通过时间轴推进相机（模拟运镜）
- * 5. 时长到 → stop() → blob 给用户下载
- *
- * 简化策略：
- * - 不控制 R3F 内部状态（避免耦合）
- * - 通过 setPreviewT + setPlaying 让 store 驱动相机
- * - 浏览器录 canvas 实际帧率可能不稳（MediaRecorder 软编码）
- *   MVP 接受 · 后续可换 WebCodecs VideoEncoder（硬编码）
+ * 2. 按导出像素锁定 gl 缓冲 + camera.aspect（避免 9:16 等竖屏被 CSS 横屏宽高比拉变形）
+ * 3. canvas.captureStream(fps) 拿 MediaStream
+ * 4. MediaRecorder 录 WebM
+ * 5. 期间通过时间轴推进相机（模拟运镜）
+ * 6. 时长到 → stop() → blob 给用户下载
  */
 
 import type { SceneJSON } from '@director-stage/scene-schema';
+import type { PerspectiveCamera } from 'three';
 import { useSceneStore } from '../store/scene';
 
 interface ExportOptions {
@@ -54,6 +50,13 @@ type ExportGl = {
   domElement: HTMLCanvasElement;
 };
 
+type ExportWindow = {
+  __ds_gl__?: ExportGl;
+  __ds_camera__?: PerspectiveCamera;
+  __DS_EXPORTING__?: boolean;
+  __DS_EXPORT_PX__?: { width: number; height: number };
+};
+
 /**
  * 主入口
  *
@@ -76,26 +79,39 @@ export async function exportSceneVideo(
   }
 
   const px = exportPixelSize(scene.aspect);
-  const gl = (window as unknown as { __ds_gl__?: ExportGl }).__ds_gl__;
+  const w = window as unknown as ExportWindow;
+  const gl = w.__ds_gl__;
+  const camera = w.__ds_camera__;
   const prevRatio = gl ? gl.getPixelRatio() : 1;
   const cssW = canvas.clientWidth || px.width;
   const cssH = canvas.clientHeight || px.height;
+  const prevAspect = camera?.aspect;
+  const prevCssW = canvas.style.width;
+  const prevCssH = canvas.style.height;
+
+  // 锁定导出宽高比：缓冲像素 + CSS 显示尺寸 + 相机 projection 三者一致
+  w.__DS_EXPORTING__ = true;
+  w.__DS_EXPORT_PX__ = { width: px.width, height: px.height };
+
   if (gl) {
     gl.setPixelRatio(1);
-    gl.setSize(px.width, px.height, false);
-    await sleep(60);
+    // updateStyle=true：让 canvas CSS 也变成导出分辨率，避免 R3F resize 用旧横屏 client 尺寸覆盖 aspect
+    gl.setSize(px.width, px.height, true);
   }
+  if (camera) {
+    camera.aspect = px.width / px.height;
+    camera.updateProjectionMatrix();
+  }
+  await sleep(80);
 
   try {
-    // 1. 拿流
     const fps = opts.fps;
     const stream = canvas.captureStream(fps);
 
-    // 2. MediaRecorder（优先选 video/webm;codecs=vp9，浏览器不支持时回退 vp8）
     const mimeType = pickMimeType();
     const recorder = new MediaRecorder(stream, {
       mimeType,
-      videoBitsPerSecond: 4_000_000, // 4 Mbps · 粗略视频够用
+      videoBitsPerSecond: 4_000_000,
     });
 
     const chunks: Blob[] = [];
@@ -107,11 +123,8 @@ export async function exportSceneVideo(
       recorder.onstop = () => resolve();
     });
 
-    // 3. 开始录制
-    recorder.start(100); // 100ms 一个 chunk · 避免内存压力
+    recorder.start(100);
 
-    // 4. 推进时间 · 让 CameraRig.useFrame (playing=true) 自动累加 previewT
-    // exporter 只 sleep 等帧过去 · 避免与 CameraRig 同时改 previewT 导致 camera 抖动
     const store = useSceneStore.getState();
     const wasPlaying = store.playing;
     store.setPlaying(true);
@@ -122,10 +135,17 @@ export async function exportSceneVideo(
     const startTime = performance.now();
 
     try {
-      // 等 CameraRig 自己累加 previewT · exporter 只 sleep + 报进度
       while (true) {
         if (opts.shouldCancel?.()) {
           throw new Error('cancelled');
+        }
+        // 每帧再锁一次 aspect，防止 R3F resize 中途改回
+        if (camera) {
+          const next = px.width / px.height;
+          if (Math.abs(camera.aspect - next) > 0.0001) {
+            camera.aspect = next;
+            camera.updateProjectionMatrix();
+          }
         }
         const elapsed = (performance.now() - startTime) / 1000;
         const progress = Math.min(elapsed / duration, 1);
@@ -148,7 +168,17 @@ export async function exportSceneVideo(
       type: mimeType,
     };
   } finally {
+    w.__DS_EXPORTING__ = false;
+    w.__DS_EXPORT_PX__ = undefined;
+    if (camera && prevAspect != null) {
+      camera.aspect = prevAspect;
+      camera.updateProjectionMatrix();
+    }
+    canvas.style.width = prevCssW;
+    canvas.style.height = prevCssH;
     restoreExportSize(gl, prevRatio, cssW, cssH);
+    // 让 letterbox / R3F 按当前视口重算
+    window.dispatchEvent(new Event('resize'));
   }
 }
 
@@ -167,7 +197,7 @@ function pickMimeType(): string {
 function restoreExportSize(gl: ExportGl | undefined, ratio: number, cssW: number, cssH: number) {
   if (!gl) return;
   gl.setPixelRatio(ratio || 1);
-  gl.setSize(Math.max(1, cssW), Math.max(1, cssH), false);
+  gl.setSize(Math.max(1, cssW), Math.max(1, cssH), true);
 }
 
 function sleep(ms: number): Promise<void> {

@@ -1,12 +1,34 @@
 import { useEffect, useLayoutEffect, useRef, Component, type ReactNode } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { OrbitControls, TransformControls, Grid, Environment } from '@react-three/drei';
+import type { PerspectiveCamera } from 'three';
 import { useSceneStore, type Vec3 } from '../store/scene';
 import { useT } from '../i18n';
 import { ActorMesh } from './ActorMesh';
 import { EnvMesh } from './EnvMesh';
 import { CameraRig } from './CameraRig';
+
+/** 导出期间强制相机宽高比 = 导出像素比，避免 CSS 尺寸与缓冲不一致导致拉伸 */
+function ExportAspectLock() {
+  const { camera } = useThree();
+  useFrame(() => {
+    const w = window as unknown as {
+      __DS_EXPORTING__?: boolean;
+      __DS_EXPORT_PX__?: { width: number; height: number };
+    };
+    if (!w.__DS_EXPORTING__ || !w.__DS_EXPORT_PX__) return;
+    const { width, height } = w.__DS_EXPORT_PX__;
+    if (height <= 0) return;
+    const next = width / height;
+    const cam = camera as PerspectiveCamera;
+    if (Math.abs(cam.aspect - next) > 0.0001) {
+      cam.aspect = next;
+      cam.updateProjectionMatrix();
+    }
+  });
+  return null;
+}
 
 /**
  * R3F Canvas 错误捕获
@@ -108,7 +130,7 @@ export function SceneViewer() {
     const ro = new ResizeObserver(computeSize);
     ro.observe(wrap);
     return () => ro.disconnect();
-  }, []);
+  }, [scene.aspect]);
 
   // Esc 退出自由视角模式
   useEffect(() => {
@@ -175,8 +197,9 @@ export function SceneViewer() {
         camera={{ position: [0, 4, 10], fov: 50, near: 0.1, far: 100 }}
         gl={{ preserveDrawingBuffer: true /* 关键：exporter 需要 captureStream */ }}
         style={{ background: 'var(--canvas-bg)' }}
-        onCreated={({ gl }) => {
+        onCreated={({ gl, camera }) => {
           (window as unknown as { __ds_gl__?: typeof gl }).__ds_gl__ = gl;
+          (window as unknown as { __ds_camera__?: typeof camera }).__ds_camera__ = camera;
           // 暴露 WebGL context 给诊断用 · 方便后续 debug 拿 context loss 事件
           (window as unknown as { __ds_webgl_ctx__?: WebGLRenderingContext | null }).__ds_webgl_ctx__ = gl.getContext();
           const ctx = gl.getContext();
@@ -226,6 +249,7 @@ export function SceneViewer() {
 
         {/* 相机运镜 + 预览 */}
         <CameraRig />
+        <ExportAspectLock />
 
         {/* 摄像机轨道控制 · 仅 freeViewMode 时启用 */}
         <CaptureOrbitControls />
@@ -262,34 +286,51 @@ export function SceneViewer() {
       {/* Canvas 外 · 右下角浮动"📷 保存当前视角"按钮 · 用普通 CSS 定位避开 R3F transform */}
       <CaptureViewOverlay />
 
+      {/* 比例角标 · 所见即所得画面框 */}
+      <div className="scene-aspect-badge" aria-hidden>
+        {t('scene.aspectBadge', { aspect: scene.aspect })}
+      </div>
+
       {/* 顶部小贴士 */}
       <div className="scene-tip">
         {freeViewMode ? t('scene.tipFree') : t('scene.tipDefault')}
       </div>
       <style>{`
         /* 所见即所得 · 外层 wrap (app-center 1fr 行)
-           背景用 cream 色 · 区分 sidebar/properties 的 paper 白 · 让 letterbox 区域明显 */
+           深色 letterbox · 内层比例框就是最终成片范围 */
         .scene-viewer-wrap {
           position: relative;
           width: 100%; height: 100%;
           min-width: 0; min-height: 0;
-          background: var(--bg);
+          background: rgba(0, 0, 0, 0.3);
           display: flex;
           align-items: center;
           justify-content: center;
           overflow: hidden;
         }
-        /* 内层 scene-viewer · 按 scene.aspect fit · 加细边框表示视频边界 */
+        /* 内层 scene-viewer · 按 scene.aspect fit · 高对比边框 = 视频安全框 */
         .scene-viewer {
           position: relative;
           /* width/height 由 useLayoutEffect 根据 scene.aspect + wrap size 计算 */
           min-width: 0; min-height: 0;
           overflow: hidden;
-          border: 1px solid var(--ink);
-          box-shadow: 0 4px 24px rgba(20, 23, 30, 0.18);
+          border: 2px solid rgba(255, 196, 86, 0.85);
+          box-shadow:
+            0 0 0 1px rgba(0, 0, 0, 0.75),
+            0 8px 28px rgba(0, 0, 0, 0.45);
         }
         .scene-viewer.free canvas { cursor: grab !important; }
         .scene-viewer.free canvas:active { cursor: grabbing !important; }
+        .scene-aspect-badge {
+          position: absolute; top: 8px; right: 10px; z-index: 3;
+          padding: 3px 9px;
+          background: rgba(0,0,0,0.62); color: rgba(255,200,100,0.95);
+          border: 1px solid rgba(255,180,60,0.5);
+          border-radius: 4px; font-size: 11px; font-weight: 600;
+          letter-spacing: 0.04em;
+          font-family: 'JetBrains Mono', ui-monospace, monospace;
+          pointer-events: none; backdrop-filter: blur(4px);
+        }
         .scene-tip {
           position: absolute; top: 8px; left: 12px; padding: 4px 10px;
           background: rgba(20,23,42,0.65); color: #f0ead9;

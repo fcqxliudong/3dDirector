@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, Component, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
-import { OrbitControls, TransformControls, Grid, Environment } from '@react-three/drei';
+import { OrbitControls, TransformControls, Grid } from '@react-three/drei';
 import type { PerspectiveCamera } from 'three';
 import { useSceneStore, type Vec3 } from '../store/scene';
 import { useT } from '../i18n';
@@ -252,13 +252,11 @@ export function SceneViewer() {
           console.info('[SceneViewer] Canvas created · WebGL ready');
         }}
       >
-        {/* 灯光：3 点照明 */}
-        <ambientLight intensity={0.4} />
+        {/* 灯光：3 点照明 + hemisphere 模拟天空/地面光(零外部 HDR 依赖) */}
+        <ambientLight intensity={0.5} />
+        <hemisphereLight args={['#bcd9ff', '#6a6048', 0.55]} />
         <directionalLight position={[5, 8, 5]} intensity={0.8} castShadow />
         <directionalLight position={[-5, 4, -3]} intensity={0.3} color="#88aaff" />
-
-        {/* 环境贴图（用于反射） */}
-        <Environment preset="city" />
 
         {/* 地面网格（导演参考用） */}
         <Grid

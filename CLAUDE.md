@@ -119,6 +119,17 @@ require_once __DIR__ . '/director_stage_schema.php';
 - **根因**:`if (selectedId === 'xxx') { useStore(...) }` 条件性 hook 调用
 - **修法**:hooks 必须无条件在顶层调用,后续判断只用 const 派生变量
 
+### 3.8 `git clean -fdX` 在 Windows 上 = 真删 + 不走回收站(2026-09-30 教训)
+
+- **症状**:跑 `git clean -fdX -e 'server-php/deploy-remote.ps1'` 想保留 deploy 脚本,但结果:`-e` 白名单**没生效**,所有 .gitignored 都真删了,包括 `deploy-remote.ps1`(用户工作流核心)、`packages/web/dist/`(部署时需要的 build 输出)、`node_modules/`(开发依赖)
+- **根因**:
+  1. Windows PowerShell 跑 `git clean` 不走回收站,直接物理删除
+  2. `git clean -e <pattern>` 白名单**位置/语法**敏感:在 `--` 前必须把 `-e` 紧跟 `-fdX`,且 pattern 是相对 `/workspace` 根,不是 `(root)` 仓库根
+  3. 即便 `-e` 写对了,某些情况下 Git 仍会把白名单当额外操作,**实际行为不可靠**
+- **修法**:先 `git clean -nfX` 看 dry-run 列表,**确认无误** + 再 `git clean -fdX`。永远不要在没看到列表时直接执行。
+- **预防**:`deploy-remote.ps1`、`dist/`、`node_modules/` 这种关键 .gitignored 文件,**绝不要靠 git clean -e 保留**,必须单独 cp -r 到备份目录
+- **踩坑后的恢复路径**:`git fsck --lost-found`(只对已 track 文件有效,对未 track 的 .gitignored 文件无效 → 只能重写 + 重新构建)
+
 ---
 
 ## 4. 不要碰的东西
@@ -128,7 +139,7 @@ require_once __DIR__ . '/director_stage_schema.php';
 - ❌ `/home/wwwroot/ai_video/static/` — ai_video 自己的前端
 - ❌ `phone_auth/` 模块(ai_video 视频项目端,只读约束,memory 明确)
 - ✅ `/home/wwwroot/ai_video/director_stage/` 整个目录 — 这是导演台自己的,可以动
-- ✅ ai_video/api/ 下的 director_stage_*.php proxy — **计划清理中**,等前端走绝对路径后可以删
+- ✅ ai_video/api/ 下的 director_stage_*.php proxy — **2026-09-30 已清理**(备份到 `ai_video/api/backup-director-stage-proxy-20260930-105632/`)
 
 ---
 
@@ -146,7 +157,8 @@ ps -ef | grep 'php-fpm: master'
 ls /home/wwwroot/ai_video/director_stage/lib/
 
 # 4. 浏览器强刷 + 点"从节点重建"→ 不再 500
-# URL: https://ai-video.eastseer.com/ai_video/director_stage/
+# URL: https://ai-video.eastseer.com/director_stage/  (注意:不再走 /ai_video/ 前缀)
+# API:  https://ai-video.eastseer.com/director_stage/api/...
 ```
 
 ---

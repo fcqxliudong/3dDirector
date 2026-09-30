@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, Component, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
+// three-stdlib 不带 .d.ts;仅用作类型导入(@ts-expect-error 抑制 TS7016)
+// @ts-expect-error no declaration file for three-stdlib
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { OrbitControls, TransformControls, Grid } from '@react-three/drei';
 import type { PerspectiveCamera } from 'three';

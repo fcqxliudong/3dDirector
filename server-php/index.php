@@ -24,7 +24,7 @@ session_write_close();
 
 // 未登录则重定向到 ai_video 登录页
 if (!$u) {
-    $loginUrl = '/login.php?redirect=' . urlencode('/ai_video/director_stage/');
+    $loginUrl = '/login.php?redirect=' . urlencode('/director_stage/');
     header('Location: ' . $loginUrl);
     exit;
 }
@@ -37,18 +37,19 @@ $userPayload = json_encode([
 ], JSON_UNESCAPED_UNICODE);
 
 // ─── 注入绝对路径 endpoint（不依赖 ai_video/api/ 下的 proxy）────────
-// 路径 /ai_video/director_stage/api/ 与 Nginx location 路由匹配
-// 历史上注入过相对路径 '/api/director_stage_*.php'，会被前端解析为
-// /director_stage/api/director_stage_*.php（页面 URL 的相对路径），走 ai_video/api/ 下的 proxy 文件
-// 现改为绝对路径：前端直接命中 /home/wwwroot/ai_video/director_stage/api/
-// 可以安全删除 ai_video/api/director_stage_*.php proxy（保留兼容也可以，下次清理时确认）
+// Nginx root 是 /home/wwwroot/ai_video，访问 /director_stage/... 会映射到
+// /home/wwwroot/ai_video/director_stage/...（director_stage 是 ai_video 的子目录）
+// ⚠️ 不要在路径前加 /ai_video/，否则 Nginx 会拼成 /home/wwwroot/ai_video/ai_video/director_stage/...
+// 历史上注入过相对路径 '/api/director_stage_*.php'（走 ai_video/api/ 下的 proxy 文件），
+// 现改为绝对路径：前端直接命中 /director_stage/api/director_stage_*.php
+// proxy 文件可以安全删除（保留兼容也可以，下次清理时确认）
 $endpointsPayload = json_encode([
-    'schema'    => '/ai_video/director_stage/api/director_stage_schema.php',
-    'assets'    => '/ai_video/director_stage/api/director_stage_assets.php',
-    'scenes'    => '/ai_video/director_stage/api/director_stage_scene.php',
-    'render'    => '/ai_video/director_stage/api/director_stage_render.php',
-    'agent'     => '/ai_video/director_stage/api/director_stage_scene_agent.php',
-    'selfcheck' => '/ai_video/director_stage/api/director_stage_selfcheck.php',
+    'schema'    => '/director_stage/api/director_stage_schema.php',
+    'assets'    => '/director_stage/api/director_stage_assets.php',
+    'scenes'    => '/director_stage/api/director_stage_scene.php',
+    'render'    => '/director_stage/api/director_stage_render.php',
+    'agent'     => '/director_stage/api/director_stage_scene_agent.php',
+    'selfcheck' => '/director_stage/api/director_stage_selfcheck.php',
 ], JSON_UNESCAPED_UNICODE);
 
 // ─── 优先输出 Vite 编译产物 ────────────────────────────────────

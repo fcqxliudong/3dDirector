@@ -26,9 +26,10 @@
 - `/home/wwwroot/ai_video/director_stage/` 整个目录
 
 **待清理**(不破坏 ai_video):
-- `/home/wwwroot/ai_video/api/director_stage_*.php` 7 个 proxy 文件(101 字节,只是 `require '/../director_stage/api/...'`)
-- 现在还在用(页面 URL 相对路径 fetch 命中 proxy)
-- 前端已切绝对路径后(`/ai_video/director_stage/api/...`)可删,删除前先验证前端不依赖
+- ~~`/home/wwwroot/ai_video/api/director_stage_*.php` 7 个 proxy 文件(101 字节,只是 `require '/../director_stage/api/...'`)~~
+- ~~现在还在用(页面 URL 相对路径 fetch 命中 proxy)~~
+- ~~前端已切绝对路径后(`/ai_video/director_stage/api/...`)可删,删除前先验证前端不依赖~~
+- ✅ **2026-09-30 已清理** — 7 个 proxy 文件已备份到 `/home/wwwroot/ai_video/api/backup-director-stage-proxy-20260930-105632/` 并从 `ai_video/api/` 删除。前端走绝对路径 `/director_stage/api/` 不受影响。
 
 ## 部署
 
@@ -43,7 +44,8 @@
 2. **deploy 漏传 `lib/`** — 旧版 deploy-remote.ps1 只传 api/,缺 lib/ 会导致所有 endpoint 500(error log 找不到 director_stage/lib/auth.php)。
 3. **PHP-FPM opcache** — 部署后 `killall -USR2 php-fpm` 让 master 重启,worker 才用新字节码。
 4. **drei `<Environment preset>` 加载外部 HDR** — 在某些网络环境失败,触发 CanvasErrorBoundary → 改用 `<hemisphereLight>` 零外部依赖。
-5. **Nginx 默认 root 是 `/home/wwwroot/ai_video`** — director_stage 访问 URL 是 `/ai_video/director_stage/`(不是 `/director_stage/`)。后者会 404。
+5. **Nginx 默认 root 是 `/home/wwwroot/ai_video`** — director_stage 访问 URL 是 `/director_stage/`(root + 子目录)。**不能**用 `/ai_video/director_stage/`(会被拼成 `/home/wwwroot/ai_video/ai_video/director_stage/...` 多一段 ai_video,文件不存在 → 404)。修复:index.php 注入端点路径用 `/director_stage/api/...`(不带 `/ai_video/` 前缀)。
+6. **旧版 ai_video proxy 文件** — `ai_video/api/director_stage_*.php` 7 个文件只是 `require '/../director_stage/api/...'`。前端已走绝对路径 `/director_stage/api/` 后可删,删前先 tar 备份到 `ai_video/api/backup-director-stage-proxy-<时间戳>/`(详见 §待清理)。
 
 ## 端到端验证
 

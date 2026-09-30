@@ -45,7 +45,10 @@ function AppStyles() {
       }
       .app-center {
         display: grid;
-        grid-template-rows: 1fr 180px;
+        /* SceneViewer 占 1fr(自适应填满)·Timeline 用 auto(按内容撑开)
+         · 关键:不再固定 180px,否则 Actor 多了轨道被挤掉
+         · Timeline 内部 max-height + overflow-y 兜底防止占满全屏 */
+        grid-template-rows: minmax(0, 1fr) auto;
         min-height: 0;
         min-width: 0;
       }

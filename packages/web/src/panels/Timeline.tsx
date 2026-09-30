@@ -336,6 +336,11 @@ export function Timeline() {
         </div>
         {/* 视角操作按钮组 · 推到 .timeline-controls 最右侧 */}
         <ViewCaptureButtons />
+        {/* 可见范围标签 · 挪到顶栏最末端(原在底部,被 Timeline 容器裁掉)
+            · 字号 10px + 灰色,跟缩放区视觉权重区分开 */}
+        <span className="view-range mono">
+          {t('timeline.viewRange', { a: viewRange.start.toFixed(1), b: viewRange.end.toFixed(1), total: scene.duration })}
+        </span>
       </div>
 
       <div className="timeline-track">
@@ -525,10 +530,6 @@ export function Timeline() {
           </div>
           </div>
         </div>
-        {/* 可见范围标签 · 显示当前 pan 到的时间区间 */}
-        <div className="view-range mono">
-          {t('timeline.viewRange', { a: viewRange.start.toFixed(1), b: viewRange.end.toFixed(1), total: scene.duration })}
-        </div>
       </div>
 
       <style>{`
@@ -543,6 +544,9 @@ export function Timeline() {
              track-rail zoom 后会撑大整个 grid · 必须显式 min-width: 0 */
           min-width: 0;
           overflow: hidden;
+          /* 自适应高度(Actor 多了自动撑高)+ 上限防止挤掉 Canvas */
+          max-height: 60vh;
+          overflow-y: auto;
         }
         .timeline-controls {
           display: flex; align-items: center; gap: 8px;
@@ -647,7 +651,11 @@ export function Timeline() {
         }
         .view-range {
           font-size: 10px; color: var(--muted);
-          padding: 4px 8px 0;
+          white-space: nowrap;
+          padding-left: 10px;
+          margin-left: 4px;
+          border-left: 1px solid var(--line);
+          align-self: center;
         }
         .zoom-controls {
           display: flex; align-items: center; gap: 4px;

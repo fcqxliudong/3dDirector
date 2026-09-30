@@ -128,5 +128,14 @@
   "preset.corridor": "走廊",
   "preset.street": "街道",
   "preset.forest": "森林",
-  "preset.space": "太空"
+  "preset.space": "太空",
+  "tool.translate": "移动 W",
+  "tool.rotate": "旋转 E",
+  "tool.scale": "缩放 R",
+  "props.scale": "缩放 scale",
+  "actor.keyframes": "关键帧",
+  "actor.kfAddAtT": "+ 在 t={t}s 添加",
+  "actor.kfDeleteConfirm": "删除 {label} 关键帧 #{i} (t={t}s)？",
+  "actor.kfMinWarn": "至少保留 1 个关键帧",
+  "actor.kfDotTitle": "关键帧 #{i} · t={t}s"
 }

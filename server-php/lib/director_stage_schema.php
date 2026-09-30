@@ -73,6 +73,7 @@ const DS_SCENE_LIMITS = [
     'actors_max'             => 10,
     'camera_keyframes_min'   => 2,
     'camera_keyframes_max'   => 20,
+    'actor_keyframes_max'    => 100,
     'camera_fov_min'         => 10,
     'camera_fov_max'         => 120,
 ];
@@ -252,6 +253,63 @@ function ds_validate_scene(mixed $input): array
                         if ($sortedMoves[$k]['t0'] < $sortedMoves[$k - 1]['t1']) {
                             $errors[] = ['path' => "actors[$i].moves", 'message' => 'actor.moves 时间不能重叠'];
                             break;
+                        }
+                    }
+                }
+            }
+
+            // scale (v0.7+ Maya 缩放手柄)
+            if (isset($a['scale']) && !ds_is_vec3($a['scale'])) {
+                $errors[] = ['path' => "actors[$i].scale", 'message' => 'actor.scale 必须是 Vec3'];
+            }
+
+            // keyframes (v0.7+ 替代 moves)
+            if (isset($a['keyframes'])) {
+                if (!is_array($a['keyframes'])) {
+                    $errors[] = ['path' => "actors[$i].keyframes", 'message' => 'actor.keyframes 必须是数组'];
+                } elseif (count($a['keyframes']) > DS_SCENE_LIMITS['actor_keyframes_max']) {
+                    $errors[] = ['path' => "actors[$i].keyframes", 'message' => 'actor.keyframes 最多 ' . DS_SCENE_LIMITS['actor_keyframes_max'] . ' 个'];
+                } else {
+                    $sortedKfs = $a['keyframes'];
+                    usort($sortedKfs, fn ($x, $y) => ($x['t'] ?? 0) <=> ($y['t'] ?? 0));
+                    foreach ($a['keyframes'] as $j => $kf) {
+                        if (!is_array($kf)) {
+                            $errors[] = ['path' => "actors[$i].keyframes[$j]", 'message' => 'keyframe 必须是对象'];
+                            continue;
+                        }
+                        if (!is_numeric($kf['t'] ?? null) || $kf['t'] < 0) {
+                            $errors[] = ['path' => "actors[$i].keyframes[$j].t", 'message' => 'keyframe.t 必须是 >= 0 的数字'];
+                        }
+                        if (!ds_is_vec3($kf['pos'] ?? null)) {
+                            $errors[] = ['path' => "actors[$i].keyframes[$j].pos", 'message' => 'keyframe.pos 必须是 Vec3'];
+                        }
+                        if (isset($kf['facing']) && !ds_is_vec3($kf['facing'])) {
+                            $errors[] = ['path' => "actors[$i].keyframes[$j].facing", 'message' => 'keyframe.facing 必须是 Vec3'];
+                        }
+                        if (isset($kf['scale']) && !ds_is_vec3($kf['scale'])) {
+                            $errors[] = ['path' => "actors[$i].keyframes[$j].scale", 'message' => 'keyframe.scale 必须是 Vec3'];
+                        }
+                        if (isset($kf['pose']) && !in_array($kf['pose'], DS_ACTOR_POSES, true)) {
+                            $errors[] = ['path' => "actors[$i].keyframes[$j].pose", 'message' => 'keyframe.pose 必须是 6 个枚举之一'];
+                        }
+                        if (isset($kf['ease']) && !in_array($kf['ease'], DS_EASE_TYPES, true)) {
+                            $errors[] = ['path' => "actors[$i].keyframes[$j].ease", 'message' => 'keyframe.ease 必须是 4 个枚举之一'];
+                        }
+                    }
+                    // 时间单调非递减
+                    for ($k = 1; $k < count($sortedKfs); $k++) {
+                        if ($sortedKfs[$k]['t'] < $sortedKfs[$k - 1]['t'] - 0.001) {
+                            $errors[] = ['path' => "actors[$i].keyframes", 'message' => 'actor.keyframes 时间必须单调非递减'];
+                            break;
+                        }
+                    }
+                    // t 不能超过 duration
+                    $duration = $input['duration'] ?? null;
+                    if (is_numeric($duration)) {
+                        foreach ($a['keyframes'] as $j => $kf) {
+                            if (isset($kf['t']) && $kf['t'] > $duration + 0.001) {
+                                $errors[] = ['path' => "actors[$i].keyframes[$j].t", 'message' => 'keyframe.t 不能超过 duration'];
+                            }
                         }
                     }
                 }

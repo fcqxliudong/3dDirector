@@ -28,6 +28,7 @@ export type {
   Vec3,
   LookAtTarget,
   ActorMove,
+  ActorKeyframe,
   Actor,
   CameraKeyframe,
   Camera,

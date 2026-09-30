@@ -21,6 +21,7 @@ import {
   ACTOR_POSES,
   type SceneJSON,
   type Actor,
+  type ActorKeyframe,
   type CameraKeyframe,
   type Vec3,
   type ActorPose,
@@ -29,11 +30,14 @@ import {
   type EnvProp,
 } from '@director-stage/scene-schema';
 
-export type { SceneJSON, Actor, CameraKeyframe, Vec3, ActorPose, ScenePreset, AspectRatio, EnvProp };
+export type { SceneJSON, Actor, ActorKeyframe, CameraKeyframe, Vec3, ActorPose, ScenePreset, AspectRatio, EnvProp };
+
+/** TransformControls 模式（Maya 风格 W/E/R） */
+export type TransformMode = 'translate' | 'rotate' | 'scale';
 
 interface SceneState {
   scene: SceneJSON;
-  /** 当前选中的物体 id（actor.id 或 camera keyframe 索引 "kf:0"）*/
+  /** 当前选中的物体 id（actor.id 或 camera keyframe 索引 "kf:0" 或 actor keyframe 索引 "akf:A:0"）*/
   selectedId: string | null;
   /** 当前时间 t（秒）· 用于预览运镜 */
   previewT: number;
@@ -49,6 +53,15 @@ interface SceneState {
    * 点 CaptureView 按钮存视角后自动切回 false
    */
   freeViewMode: boolean;
+
+  /**
+   * TransformControls 当前模式（Maya 风格）
+   * - 'translate' (默认): 移动手柄
+   * - 'rotate': 旋转手柄
+   * - 'scale': 缩放手柄
+   * W/E/R 切换 · Esc 取消选中
+   */
+  transformMode: TransformMode;
 
   // ─── 操作 ────────────────────────────────────────
   init: (preset: ScenePreset) => void;
@@ -70,6 +83,11 @@ interface SceneState {
   removeKeyframe: (i: number) => void;
   addKeyframeAtCurrentT: (override?: { pos?: Vec3; lookAt?: Vec3 | string }) => void;
 
+  // ── Actor 关键帧 CRUD（替代 moves） ──
+  addActorKeyframeAtCurrentT: (actorId: string, override?: Partial<ActorKeyframe>) => void;
+  updateActorKeyframe: (actorId: string, idx: number, patch: Partial<ActorKeyframe>) => void;
+  removeActorKeyframe: (actorId: string, idx: number) => void;
+
   /** 一键应用 6 个运镜模板（替换现有 keyframes）*/
   applyCameraPreset: (presetId: CameraPresetId, options?: CameraPresetOptions) => void;
 
@@ -78,6 +96,7 @@ interface SceneState {
   setPlaying: (p: boolean) => void;
 
   setFreeViewMode: (on: boolean) => void;
+  setTransformMode: (mode: TransformMode) => void;
 
   /** 派生：序列化用于 hash / diff */
   hash: () => string;
@@ -100,6 +119,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
   errors: [],
 
   freeViewMode: false,
+  transformMode: 'translate',
 
   init: (preset) => {
     const s = emptyScene(preset === 'open' ? 'open' : preset);
@@ -207,15 +227,27 @@ export const useSceneStore = create<SceneState>((set, get) => ({
   setDuration: (d) => {
     set((st) => {
       const newDuration = Math.max(1, Math.min(30, d));
-      // 超出新 duration 的关键帧 t 截到边界 · 避免 schema 校验失败
+      // 超出新 duration 的 camera keyframes t 截到边界 · 避免 schema 校验失败
       const clippedKfs = st.scene.camera.keyframes.map((kf) =>
         kf.t > newDuration ? { ...kf, t: newDuration } : kf
+      );
+      // actor keyframes 同步 clip
+      const clippedActors = st.scene.actors.map((a) =>
+        a.keyframes
+          ? {
+              ...a,
+              keyframes: a.keyframes.map((kf) =>
+                kf.t > newDuration ? { ...kf, t: newDuration } : kf
+              ),
+            }
+          : a
       );
       return {
         scene: {
           ...st.scene,
           duration: newDuration,
           camera: { ...st.scene.camera, keyframes: clippedKfs },
+          actors: clippedActors,
         },
       };
     });
@@ -255,8 +287,92 @@ export const useSceneStore = create<SceneState>((set, get) => ({
           ),
         },
       },
-      selectedId: st.selectedId === id ? null : st.selectedId,
+      // 清理选中（actor id 或该 actor 的某个 keyframe）
+      selectedId:
+        st.selectedId === id || (st.selectedId ?? '').startsWith(`akf:${id}:`)
+          ? null
+          : st.selectedId,
     }));
+  },
+
+  /**
+   * 在当前 previewT 时刻为 actor 添加关键帧
+   * - 已有同 t 关键帧 → 覆盖
+   * - 无 keyframes → 自动从 start/facing/pose 创建一个 t=0 关键帧（如果 t=0）然后添加新关键帧
+   */
+  addActorKeyframeAtCurrentT: (actorId, override) => {
+    set((st) => {
+      const actor = st.scene.actors.find((a) => a.id === actorId);
+      if (!actor) return st;
+      const t = st.previewT;
+      const existingKfs = actor.keyframes ?? [];
+      const fallbackPos = existingKfs[0]?.pos ?? actor.start ?? [0, 0, 0];
+      const fallbackFacing = existingKfs[0]?.facing ?? actor.facing ?? [0, 0, 1];
+      const fallbackPose = existingKfs[0]?.pose ?? actor.pose ?? 'stand';
+      const fallbackScale = existingKfs[0]?.scale ?? actor.scale ?? [1, 1, 1];
+      const newKf: ActorKeyframe = {
+        t,
+        pos: override?.pos ?? fallbackPos,
+        facing: override?.facing ?? fallbackFacing,
+        scale: override?.scale ?? fallbackScale,
+        pose: override?.pose ?? fallbackPose,
+        ease: override?.ease,
+      };
+      // 同 t 覆盖
+      const existingIdx = existingKfs.findIndex((k) => Math.abs(k.t - t) < 0.1);
+      let newKfs: ActorKeyframe[];
+      if (existingIdx >= 0) {
+        newKfs = [...existingKfs];
+        newKfs[existingIdx] = { ...newKfs[existingIdx], ...newKf };
+      } else {
+        newKfs = [...existingKfs, newKf].sort((a, b) => a.t - b.t);
+      }
+      return {
+        scene: {
+          ...st.scene,
+          actors: st.scene.actors.map((a) =>
+            a.id === actorId ? { ...a, keyframes: newKfs } : a
+          ),
+        },
+      };
+    });
+  },
+
+  updateActorKeyframe: (actorId, idx, patch) => {
+    set((st) => ({
+      scene: {
+        ...st.scene,
+        actors: st.scene.actors.map((a) =>
+          a.id === actorId && a.keyframes
+            ? {
+                ...a,
+                keyframes: a.keyframes.map((kf, i) =>
+                  i === idx ? { ...kf, ...patch } : kf
+                ),
+              }
+            : a
+        ),
+      },
+    }));
+  },
+
+  removeActorKeyframe: (actorId, idx) => {
+    set((st) => {
+      const actor = st.scene.actors.find((a) => a.id === actorId);
+      if (!actor?.keyframes || actor.keyframes.length <= 1) return st; // 至少保留 1 个
+      const newKfs = actor.keyframes.filter((_, i) => i !== idx);
+      return {
+        scene: {
+          ...st.scene,
+          actors: st.scene.actors.map((a) =>
+            a.id === actorId ? { ...a, keyframes: newKfs } : a
+          ),
+        },
+        // 清理选中（如果删的是当前选中的 actor keyframe）
+        selectedId:
+          st.selectedId === `akf:${actorId}:${idx}` ? null : st.selectedId,
+      };
+    });
   },
 
   addKeyframe: () => {
@@ -366,6 +482,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
   setPlaying: (p) => set({ playing: p }),
 
   setFreeViewMode: (on) => set({ freeViewMode: on }),
+  setTransformMode: (mode) => set({ transformMode: mode }),
 
   hash: () => stableStringify(get().scene),
   toJson: () => JSON.stringify(get().scene, null, 2),

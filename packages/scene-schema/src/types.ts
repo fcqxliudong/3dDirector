@@ -42,6 +42,27 @@ export interface ActorMove {
   pose: ActorPose;
 }
 
+/**
+ * Actor 关键帧 · 替代 moves 的统一走位方案
+ * - 跟 CameraKeyframe 对齐：t/pos/lookAt/... 这里变成 t/pos/facing/scale/pose/ease
+ * - 渲染时优先用 keyframes 插值 · fallback 到 moves · 最后 fallback 到 start
+ * - 支持 0 个关键帧（静态 actor）+ 1 个（只有起点）+ 多个（完整走位）
+ */
+export interface ActorKeyframe {
+  /** 时间（秒） */
+  t: number;
+  /** 位置（米） */
+  pos: Vec3;
+  /** 朝向（可选） · 插值用 quaternion slerp 避免绕远路 */
+  facing?: Vec3;
+  /** 缩放（各轴独立 · Maya 风格） · 默认 [1,1,1] */
+  scale?: Vec3;
+  /** 此关键帧对应的姿势 · 最近关键帧胜出（不插值） */
+  pose?: ActorPose;
+  /** 此关键帧到下一个关键帧间的缓动 */
+  ease?: EaseType;
+}
+
 export interface Actor {
   /** 唯一标识 · 用于 camera.lookAt 引用 */
   id: string;
@@ -49,13 +70,19 @@ export interface Actor {
   label: string;
   /** 渲染颜色 HEX #RRGGBB（粗略视频用纯色区分） */
   color: string;
-  /** 初始位置（米） */
-  start: Vec3;
-  /** 朝向向量 · 默认 [0, 0, 1] */
+  /** 关键帧轨道 · 推荐至少 1 个 · 但为了兼容旧场景 optional */
+  keyframes?: ActorKeyframe[];
+  /** Actor 整体默认缩放（关键帧 scale 优先） · 默认 [1,1,1] */
+  scale?: Vec3;
+
+  // ── 兼容旧版（@deprecated） ──────────────────────────
+  /** @deprecated 用 keyframes[0].pos 替代 */
+  start?: Vec3;
+  /** @deprecated 用 keyframes[0].facing 替代 */
   facing?: Vec3;
-  /** 初始姿势 */
-  pose: ActorPose;
-  /** 动作序列 · 按时间排序 */
+  /** @deprecated 用 keyframes[0].pose 替代 */
+  pose?: ActorPose;
+  /** @deprecated 用 keyframes 替代（程序化走位） */
   moves?: ActorMove[];
 }
 

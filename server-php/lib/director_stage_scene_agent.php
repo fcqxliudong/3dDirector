@@ -159,9 +159,9 @@ function ds_agent_build_from_node_rules(): string
 
 规则：
 1. 素材优先级：视频提示词 > 节点正文/标题 > 参考标题列表 > 仅时长/比例兜底
-2. 从素材抽出角色（≤10），每人 id/label/color(#RRGGBB)/start/pose；颜色要明显可辨
+2. 从素材抽出角色（≤10），每人 id/label/color(#RRGGBB)/keyframes(演员有 keyframes)/pose；颜色要明显可辨
 3. 空间：preset 一律 open；按剧情估 scene.size（室内约 8–16m，街道/户外更大）；用 env 自建地面(+可选墙/树/建筑)，不要天花板，不要套旧房间/走廊模板
-4. 有走位才写 moves，时间落在 duration 内且不重叠
+4. 走位用 actor.keyframes（关键帧轨道）而非 moves：每个 actor 至少 1 个关键帧（t=0 起步），走位时加更多关键帧（t1, t2...），关键帧间时间落在 duration 内且单调非递减；facing/scale 字段可选
 5. 至少 2～6 个 camera keyframes；lookAt 尽量引用 actor.id；可先 apply_camera_preset 再微调
 6. 不要编造大段对白；几何只服务景别与人物关系
 7. 优先一次 replace_scene 成型；参数必须通过 schema

@@ -31,12 +31,15 @@ const EASE_MAP: Record<string, string> = {
 /** 解析 keyframe.lookAt（array | actor.id）→ Vector3 */
 function resolveLookAt(
   raw: Vec3 | string | undefined,
-  actors: Array<{ id: string; start: Vec3 }>,
+  actors: Array<{ id: string; start?: Vec3; keyframes?: Array<{ pos: Vec3 }> }>,
 ): Vector3 {
   if (!raw) return new Vector3(0, 1.5, 0);
   if (typeof raw === 'string') {
     const a = actors.find((x) => x.id === raw);
-    return a ? new Vector3(...a.start) : new Vector3(0, 1.5, 0);
+    if (!a) return new Vector3(0, 1.5, 0);
+    // 优先 keyframes[0].pos · fallback start
+    const pos = a.keyframes?.[0]?.pos ?? a.start ?? [0, 0, 0];
+    return new Vector3(...pos);
   }
   return new Vector3(...raw);
 }

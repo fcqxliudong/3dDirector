@@ -71,6 +71,11 @@ export function emptyScene(
 
 /**
  * 创建一个角色（默认值版）
+ *
+ * 兼容策略：
+ * - 如果调用方没传 keyframes，自动从 start/facing/pose 创建一个 t=0 关键帧
+ * - 如果调用方传了 keyframes，原样使用
+ * - start/facing/pose 仍保留作为兼容字段（@deprecated）
  */
 export function makeActor(
   partial: Partial<import('./types.js').Actor> & {
@@ -79,10 +84,23 @@ export function makeActor(
     start: [number, number, number];
   },
 ): import('./types.js').Actor {
+  const facing = partial.facing ?? [0, 0, 1];
+  const pose = partial.pose ?? 'stand';
+  const scale = partial.scale ?? [1, 1, 1];
+  const keyframes =
+    partial.keyframes ??
+    [
+      {
+        t: 0,
+        pos: partial.start,
+        facing,
+        scale,
+        pose,
+      },
+    ];
   return {
     color: '#888888',
-    pose: 'stand',
-    facing: [0, 0, 1],
+    keyframes,
     ...partial,
   };
 }

@@ -24,6 +24,69 @@ import { useT } from '../i18n';
 const BASE_PX_PER_SECOND = 50;
 /** 默认 zoom 让 30s 场景填满 ~1500px（容器 ~600px → 默认需要 pan） */
 const DEFAULT_ZOOM = 1;
+/** 每个 Actor 关键帧轨道的垂直高度（camera 轨道固定 40px，actor 轨道 24px 一行） */
+const ACTOR_TRACK_HEIGHT = 24;
+/** Camera 关键帧轨道的垂直高度 */
+const CAMERA_TRACK_HEIGHT = 40;
+
+/**
+ * 视角操作按钮组（📐 调整视角 / 📷 保存当前视角 + ✕）
+ *
+ * 之前是浮动在 Canvas 右下角（参见 CaptureViewOverlay · 已废弃）·
+ * 挪到 Timeline 顶栏右侧空白处，跟 [▶播放 / ⏮重置 / 时间编辑 / 缩放] 形成完整的"关键帧工作流"。
+ *
+ * freeViewMode = false（默认 · 所见即所得）：
+ *   显示 "📐 调整视角" 按钮 · 点击进入自由模式
+ * freeViewMode = true（自由模式）：
+ *   显示 "📷 保存当前视角" 按钮 · 点击存视角 + 自动退出自由模式 + "✕" 取消
+ *
+ * 调用 SceneViewer 通过 window.__ds_capture_view__() 触发 capture 函数
+ * （capture 函数会用 querySelector('.view-capture .capture-btn') 给按钮加 flashed 动画）
+ */
+function ViewCaptureButtons() {
+  const previewT = useSceneStore((s) => s.previewT);
+  const freeViewMode = useSceneStore((s) => s.freeViewMode);
+  const setFreeViewMode = useSceneStore((s) => s.setFreeViewMode);
+  const t = useT();
+  return (
+    <div className={`view-capture${freeViewMode ? ' free' : ''}`}>
+      {freeViewMode ? (
+        <>
+          <button
+            className="capture-btn save"
+            onClick={() => {
+              const fn = (window as unknown as { __ds_capture_view__?: () => boolean }).__ds_capture_view__;
+              if (fn) fn();
+              // setFreeViewMode(false) 已在 capture 函数里调了
+            }}
+            title={t('scene.saveViewTitle')}
+          >
+            {t('scene.saveView')}
+          </button>
+          <button
+            className="cancel-btn"
+            onClick={() => setFreeViewMode(false)}
+            title={t('scene.cancelTitle')}
+          >
+            {t('scene.cancel')}
+          </button>
+        </>
+      ) : (
+        <button
+          className="capture-btn"
+          onClick={() => setFreeViewMode(true)}
+          title={t('scene.adjustViewTitle')}
+        >
+          {t('scene.adjustView')}
+        </button>
+      )}
+      <span className="capture-meta">{t('scene.t', { t: previewT.toFixed(2) })}</span>
+      {freeViewMode && (
+        <div className="capture-hint">{t('scene.hint')}</div>
+      )}
+    </div>
+  );
+}
 
 export function Timeline() {
   const scene = useSceneStore((s) => s.scene);
@@ -36,6 +99,7 @@ export function Timeline() {
   const updateKeyframe = useSceneStore((s) => s.updateKeyframe);
   const selectedId = useSceneStore((s) => s.selectedId);
   const select = useSceneStore((s) => s.select);
+  const removeActorKeyframe = useSceneStore((s) => s.removeActorKeyframe);
   const t = useT();
 
   // 拖动状态
@@ -273,6 +337,8 @@ export function Timeline() {
           <button onClick={zoomIn} title={t('timeline.zoomIn')}>+</button>
           <button onClick={zoomFit} title={t('timeline.zoomFit')} className="zoom-fit">⤢</button>
         </div>
+        {/* 视角操作按钮组 · 推到 .timeline-controls 最右侧 */}
+        <ViewCaptureButtons />
       </div>
 
       <div className="timeline-track">
@@ -286,7 +352,10 @@ export function Timeline() {
           <div
             ref={trackRef}
             className={`track-rail${dragging ? ' dragging' : ''}`}
-            style={{ width: `${scene.duration * BASE_PX_PER_SECOND * zoom}px` }}
+            style={{
+              width: `${scene.duration * BASE_PX_PER_SECOND * zoom}px`,
+              height: `${40 + scene.actors.length * ACTOR_TRACK_HEIGHT}px`,
+            }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -383,6 +452,58 @@ export function Timeline() {
                 }}
               >
                 <span className="kf-dot-inner">{i}</span>
+              </div>
+            );
+          })}
+
+          {/* Actor 关键帧轨道 · 每个 actor 一行 · 高度 ACTOR_TRACK_HEIGHT */}
+          {scene.actors.map((actor, actorIdx) => {
+            const kfs = actor.keyframes ?? [];
+            const trackTop = CAMERA_TRACK_HEIGHT + actorIdx * ACTOR_TRACK_HEIGHT;
+            return (
+              <div key={actor.id} className="actor-track">
+                {/* 轨道分隔线 + 标签 */}
+                <div className="actor-track-bg" style={{ top: `${trackTop}px`, height: `${ACTOR_TRACK_HEIGHT}px` }}>
+                  <span className="actor-track-label" style={{ background: actor.color }}>
+                    {actor.label}
+                  </span>
+                </div>
+                {/* Actor 关键帧圆点 */}
+                {kfs.map((kf, kfIdx) => {
+                  const isSelected = selectedId === `akf:${actor.id}:${kfIdx}`;
+                  return (
+                    <div
+                      key={`${actor.id}-${kfIdx}`}
+                      className={`kf-dot akf-dot ${isSelected ? 'selected' : ''}`}
+                      style={{
+                        left: `${(kf.t / scene.duration) * 100}%`,
+                        top: `${trackTop + (ACTOR_TRACK_HEIGHT - 22) / 2}px`,
+                        background: actor.color,
+                      }}
+                      title={`${actor.label} · ${t('actor.kfDotTitle', { i: kfIdx + 1, t: kf.t.toFixed(2) })}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // 跳到该关键帧 t + 选中 akf
+                        const liveKf = useSceneStore.getState().scene.actors.find((a) => a.id === actor.id)?.keyframes?.[kfIdx];
+                        if (!liveKf) return;
+                        select(`akf:${actor.id}:${kfIdx}`);
+                        setPreviewT(liveKf.t);
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        if (kfs.length > 1) {
+                          if (window.confirm(t('actor.kfDeleteConfirm', { i: kfIdx + 1, t: kf.t.toFixed(2) }))) {
+                            removeActorKeyframe(actor.id, kfIdx);
+                          }
+                        } else {
+                          window.alert(t('actor.kfMinWarn'));
+                        }
+                      }}
+                    >
+                      <span className="kf-dot-inner">{kfIdx + 1}</span>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
@@ -492,11 +613,40 @@ export function Timeline() {
         .track-wrap::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
         .track-rail {
           position: relative;
-          height: 40px;
+          /* height 动态算: 40 + actors.length * 24 */
           min-width: 100%;
           cursor: pointer;
           user-select: none;
           touch-action: none;
+        }
+        /* Actor 关键帧轨道 */
+        .actor-track {
+          position: absolute;
+          left: 0; right: 0; top: 0; bottom: 0;
+          pointer-events: none;
+        }
+        .actor-track-bg {
+          position: absolute;
+          left: 0; right: 0;
+          background: var(--bg);
+          border-top: 1px solid var(--line);
+          pointer-events: auto;
+        }
+        .actor-track-label {
+          position: absolute;
+          left: 4px;
+          top: 50%;
+          transform: translateY(-50%);
+          font-size: 10px;
+          padding: 1px 6px;
+          border-radius: 3px;
+          color: white;
+          font-weight: 500;
+          white-space: nowrap;
+          opacity: 0.9;
+        }
+        .akf-dot {
+          pointer-events: auto;
         }
         .view-range {
           font-size: 10px; color: var(--muted);
@@ -517,6 +667,53 @@ export function Timeline() {
         }
         .zoom-fit {
           font-size: 12px;
+        }
+        /* 视角操作按钮组 · 推到 .timeline-controls 最右侧 */
+        .view-capture {
+          display: flex; gap: 8px; align-items: center;
+          margin-left: auto; padding-left: 12px;
+          border-left: 1px solid var(--line);
+          font-size: 12px;
+          color: var(--ink);
+        }
+        .view-capture.free {
+          color: var(--accent);
+        }
+        .view-capture .capture-btn {
+          background: var(--primary);
+          color: white; border: none; padding: 6px 12px;
+          border-radius: 6px; font-size: 12px; font-weight: 500;
+          cursor: pointer; transition: all .15s ease;
+        }
+        .view-capture .capture-btn.save {
+          background: var(--accent);
+          color: var(--bg);
+        }
+        .view-capture .capture-btn:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(77,171,247,0.4);
+        }
+        .view-capture .capture-btn.save:hover {
+          box-shadow: 0 2px 8px rgba(92,255,142,0.5);
+        }
+        .view-capture .cancel-btn {
+          background: transparent; color: var(--muted);
+          border: 1px solid var(--line); padding: 6px 10px;
+          border-radius: 6px; font-size: 12px; cursor: pointer;
+        }
+        .view-capture .cancel-btn:hover {
+          background: var(--line); color: var(--ink);
+        }
+        .view-capture .capture-meta {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 11px; opacity: 0.7;
+          min-width: 64px;
+        }
+        .view-capture .capture-hint {
+          white-space: nowrap;
+          color: var(--accent);
+          font-size: 11px;
+          padding: 0 4px;
         }
         .track-rail.dragging { cursor: grabbing; }
         .tick {

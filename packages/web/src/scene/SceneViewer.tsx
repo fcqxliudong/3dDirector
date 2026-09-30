@@ -77,6 +77,9 @@ export function SceneViewer() {
   const selectedId = useSceneStore((s) => s.selectedId);
   const select = useSceneStore((s) => s.select);
   const updateKeyframe = useSceneStore((s) => s.updateKeyframe);
+  const addActorKeyframeAtCurrentT = useSceneStore((s) => s.addActorKeyframeAtCurrentT);
+  const previewT = useSceneStore((s) => s.previewT);
+  const transformMode = useSceneStore((s) => s.transformMode);
   const freeViewMode = useSceneStore((s) => s.freeViewMode);
   const setFreeViewMode = useSceneStore((s) => s.setFreeViewMode);
   const t = useT();
@@ -143,6 +146,44 @@ export function SceneViewer() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [freeViewMode, setFreeViewMode]);
+
+  /**
+   * Maya 风格快捷键 (W/E/R/Esc)
+   - W: 切到 translate
+   - E: 切到 rotate
+   - R: 切到 scale
+   - Esc: 取消选中(select(null))
+   - 输入框 / 文本域焦点时跳过（避免吞字符）
+   */
+  const setTransformMode = useSceneStore((s) => s.setTransformMode);
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // 输入控件焦点时不拦截（让用户正常打字）
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          (target as HTMLElement).isContentEditable)
+      ) {
+        return;
+      }
+      // 修饰键按下时不响应（避免吞 Ctrl+W / Cmd+R 等浏览器快捷键）
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'w' || e.key === 'W') {
+        setTransformMode('translate');
+      } else if (e.key === 'e' || e.key === 'E') {
+        setTransformMode('rotate');
+      } else if (e.key === 'r' || e.key === 'R') {
+        setTransformMode('scale');
+      } else if (e.key === 'Escape') {
+        // Esc 同时退出 freeViewMode + 取消选中
+        useSceneStore.getState().select(null);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [setTransformMode]);
 
   /**
    * 浏览器 zoom 适配：Ctrl+/- 缩放或浏览器菜单缩放不会触发 window.resize
@@ -280,11 +321,69 @@ export function SceneViewer() {
             </TransformControls>
           );
         })()}
+
+        {/* Actor 三轴手柄 · Maya 风格 (translate / rotate / scale) */}
+        {selectedId &&
+          !selectedId.startsWith('kf:') &&
+          !selectedId.startsWith('akf:') &&
+          (() => {
+            const actor = scene.actors.find((a) => a.id === selectedId);
+            if (!actor) return null;
+            // 当前 previewT 时刻 actor 的关键帧（用于手柄初始 pos/scale/yaw）
+            const kfs = actor.keyframes ?? [];
+            const curKf = kfs.find((k) => Math.abs(k.t - previewT) < 0.1);
+            const initialPos: Vec3 = curKf?.pos ?? kfs[0]?.pos ?? actor.start ?? [0, 0, 0];
+            const initialScale: Vec3 = curKf?.scale ?? kfs[0]?.scale ?? actor.scale ?? [1, 1, 1];
+            const yawToFacing = (yaw: number): Vec3 => [Math.sin(yaw), 0, Math.cos(yaw)];
+            const facingYaw = (kf?: { facing?: Vec3 }) => {
+              const f = kf?.facing ?? actor.facing ?? [0, 0, 1];
+              return Math.atan2(f[0], f[2]);
+            };
+            const initialYaw = facingYaw(curKf ?? kfs[0]);
+            return (
+              <TransformControls
+                mode={transformMode}
+                onObjectChange={(e) => {
+                  const target = e as unknown as {
+                    target?: {
+                      object?: {
+                        position: { x: number; y: number; z: number };
+                        scale: { x: number; y: number; z: number };
+                        rotation: { x: number; y: number; z: number };
+                      };
+                    };
+                  };
+                  const obj = target.target?.object;
+                  if (!obj) return;
+                  if (transformMode === 'translate') {
+                    const p = obj.position;
+                    addActorKeyframeAtCurrentT(actor.id, { pos: [p.x, p.y, p.z] });
+                  } else if (transformMode === 'scale') {
+                    const s = obj.scale;
+                    addActorKeyframeAtCurrentT(actor.id, { scale: [s.x, s.y, s.z] });
+                  } else if (transformMode === 'rotate') {
+                    // 归一化 yaw 到 [-π, π] · 防 Euler 累积溢出
+                    let yaw = obj.rotation.y;
+                    while (yaw > Math.PI) yaw -= 2 * Math.PI;
+                    while (yaw < -Math.PI) yaw += 2 * Math.PI;
+                    addActorKeyframeAtCurrentT(actor.id, { facing: yawToFacing(yaw) });
+                  }
+                }}
+              >
+                <group position={initialPos} scale={initialScale} rotation={[0, initialYaw, 0]}>
+                  {/* 隐形锚点 · 让 TransformControls attach 到一个可操控对象 */}
+                  <mesh visible={false}>
+                    <boxGeometry args={[0.001, 0.001, 0.001]} />
+                    <meshBasicMaterial />
+                  </mesh>
+                </group>
+              </TransformControls>
+            );
+          })()}
       </Canvas>
       </CanvasErrorBoundary>
 
-      {/* Canvas 外 · 右下角浮动"📷 保存当前视角"按钮 · 用普通 CSS 定位避开 R3F transform */}
-      <CaptureViewOverlay />
+      {/* 视角操作按钮已挪到 Timeline 顶栏右侧空白处（参见 panels/Timeline.tsx · ViewCaptureButtons） */}
 
       {/* 比例角标 · 所见即所得画面框 */}
       <div className="scene-aspect-badge" aria-hidden>
@@ -337,45 +436,6 @@ export function SceneViewer() {
           border-radius: 14px; font-size: 11px;
           pointer-events: none; backdrop-filter: blur(4px);
         }
-        .capture-overlay {
-          position: absolute; right: 16px; bottom: 16px;
-          display: flex; gap: 8px; align-items: center;
-          background: rgba(20,23,42,0.78); color: #f0ead9;
-          padding: 8px 12px; border-radius: 10px;
-          backdrop-filter: blur(6px);
-          font-size: 12px;
-          border: 1px solid rgba(77,171,247,0.4);
-          pointer-events: auto;
-        }
-        .capture-overlay.free {
-          border-color: rgba(92,255,142,0.6);
-          background: rgba(20,23,42,0.88);
-          box-shadow: 0 4px 16px rgba(92,255,142,0.15);
-        }
-        .capture-overlay .capture-btn {
-          background: var(--primary);
-          color: white; border: none; padding: 6px 12px;
-          border-radius: 6px; font-size: 12px; font-weight: 500;
-          cursor: pointer; transition: all .15s ease;
-        }
-        .capture-overlay .capture-btn.save { background: #5cff8e; color: #14171e; }
-        .capture-overlay .capture-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(77,171,247,0.4); }
-        .capture-overlay .capture-btn.save:hover { box-shadow: 0 2px 8px rgba(92,255,142,0.5); }
-        .capture-overlay .cancel-btn {
-          background: transparent; color: var(--muted);
-          border: 1px solid var(--line); padding: 6px 10px;
-          border-radius: 6px; font-size: 12px; cursor: pointer;
-        }
-        .capture-overlay .cancel-btn:hover { background: var(--line); color: var(--ink); }
-        .capture-overlay .capture-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; opacity: 0.7; }
-        .capture-overlay .capture-hint {
-          position: absolute; right: 0; bottom: 100%;
-          margin-bottom: 6px; white-space: nowrap;
-          background: rgba(20,23,42,0.92); color: #5cff8e;
-          padding: 4px 10px; border-radius: 6px;
-          font-size: 11px;
-          border: 1px solid rgba(92,255,142,0.4);
-        }
         @keyframes capture-flash {
           0% { transform: scale(1); }
           50% { transform: scale(1.15); background: #5cff8e; }
@@ -405,7 +465,7 @@ function CaptureOrbitControls() {
 
 /**
  * 实际的 OrbitControls · 只在 freeViewMode=true 时挂载
- * 挂载时暴露 __ds_capture_view__ 函数 · 让 CaptureViewOverlay 调用存关键帧
+ * 挂载时暴露 __ds_capture_view__ 函数 · 让 ViewCaptureButtons (Timeline 顶栏右侧) 调用存关键帧
  */
 function ActiveOrbitControls() {
   const ref = useRef<OrbitControlsImpl | null>(null);
@@ -422,7 +482,7 @@ function ActiveOrbitControls() {
       const t = controls.target;
       const lookAt: Vec3 = [t.x, t.y, t.z];
       useSceneStore.getState().addKeyframeAtCurrentT({ pos, lookAt });
-      const btn = document.querySelector('.capture-overlay .capture-btn');
+      const btn = document.querySelector('.view-capture .capture-btn');
       if (btn) {
         btn.classList.remove('flashed');
         void (btn as HTMLElement).offsetWidth;
@@ -450,57 +510,6 @@ function ActiveOrbitControls() {
 }
 
 /**
- * Canvas 外 · 右下角浮动按钮（双状态）
- *
- * freeViewMode = false（默认 · 所见即所得）：
- *   显示 "📐 调整视角" 按钮 · 点击进入自由模式
- * freeViewMode = true（自由模式）：
- *   显示 "📷 保存当前视角" 按钮 · 点击存视角 + 自动退出自由模式
- *
- * 放在 SceneViewer 的 div 里（不是 Canvas 内）· 用普通 CSS 定位
- * 避开 drei <Html> 的 3D transform 干扰
+ * 视角操作按钮已挪到 Timeline 顶栏右侧空白处 · 参见 panels/Timeline.tsx · ViewCaptureButtons
+ * （保留 .capture-btn.flashed 动画 + capture 函数 querySelector 选择器 .view-capture .capture-btn）
  */
-function CaptureViewOverlay() {
-  const previewT = useSceneStore((s) => s.previewT);
-  const freeViewMode = useSceneStore((s) => s.freeViewMode);
-  const setFreeViewMode = useSceneStore((s) => s.setFreeViewMode);
-  const t = useT();
-  return (
-    <div className={`capture-overlay${freeViewMode ? ' free' : ''}`}>
-      {freeViewMode ? (
-        <>
-          <button
-            className="capture-btn save"
-            onClick={() => {
-              const fn = (window as unknown as { __ds_capture_view__?: () => boolean }).__ds_capture_view__;
-              if (fn) fn();
-              // setFreeViewMode(false) 已在 capture 函数里调了
-            }}
-            title={t('scene.saveViewTitle')}
-          >
-            {t('scene.saveView')}
-          </button>
-          <button
-            className="cancel-btn"
-            onClick={() => setFreeViewMode(false)}
-            title={t('scene.cancelTitle')}
-          >
-            {t('scene.cancel')}
-          </button>
-        </>
-      ) : (
-        <button
-          className="capture-btn"
-          onClick={() => setFreeViewMode(true)}
-          title={t('scene.adjustViewTitle')}
-        >
-          {t('scene.adjustView')}
-        </button>
-      )}
-      <span className="capture-meta">{t('scene.t', { t: previewT.toFixed(2) })}</span>
-      {freeViewMode && (
-        <div className="capture-hint">{t('scene.hint')}</div>
-      )}
-    </div>
-  );
-}

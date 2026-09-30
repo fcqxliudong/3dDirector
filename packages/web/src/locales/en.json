@@ -128,5 +128,14 @@
   "preset.corridor": "Corridor",
   "preset.street": "Street",
   "preset.forest": "Forest",
-  "preset.space": "Space Capsule"
+  "preset.space": "Space Capsule",
+  "tool.translate": "Move W",
+  "tool.rotate": "Rotate E",
+  "tool.scale": "Scale R",
+  "props.scale": "Scale",
+  "actor.keyframes": "Keyframes",
+  "actor.kfAddAtT": "+ Add at t={t}s",
+  "actor.kfDeleteConfirm": "Delete {label} keyframe #{i} (t={t}s)?",
+  "actor.kfMinWarn": "At least 1 keyframe required",
+  "actor.kfDotTitle": "Keyframe #{i} · t={t}s"
 }

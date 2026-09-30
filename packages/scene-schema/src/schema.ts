@@ -54,14 +54,29 @@ const ActorMoveSchema = z
     message: 'move.t0 必须 < t1',
   });
 
+/** Actor 关键帧 · 替代 moves 的统一走位方案 */
+const ActorKeyframeSchema = z.object({
+  t: z.number().min(0),
+  pos: Vec3Schema,
+  facing: Vec3Schema.optional(),
+  scale: Vec3Schema.optional(),
+  pose: z.enum(ACTOR_POSES).optional(),
+  ease: z.enum(EASE_TYPES).optional(),
+});
+
 const ActorSchema = z
   .object({
     id: z.string().min(1),
     label: z.string().min(1),
     color: HexColorSchema,
-    start: Vec3Schema,
+    /** 关键帧轨道 · 至少 1 个 · 推荐 t=0 起步 · 兼容旧场景可选 */
+    keyframes: z.array(ActorKeyframeSchema).min(0).max(100).optional(),
+    /** Actor 整体默认缩放 · 默认 [1,1,1] */
+    scale: Vec3Schema.optional(),
+    // ── 兼容旧版 ──
+    start: Vec3Schema.optional(),
     facing: Vec3Schema.optional(),
-    pose: z.enum(ACTOR_POSES),
+    pose: z.enum(ACTOR_POSES).optional(),
     moves: z.array(ActorMoveSchema).max(20).optional(),
   })
   .refine(
@@ -75,6 +90,18 @@ const ActorSchema = z
       return true;
     },
     { message: '同一 actor 的 moves 不能时间重叠' },
+  )
+  .refine(
+    (a) => {
+      // actor.keyframes 时间单调非递减
+      if (!a.keyframes || a.keyframes.length < 2) return true;
+      const sorted = [...a.keyframes].sort((x, y) => x.t - y.t);
+      for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i].t < sorted[i - 1].t - 0.001) return false;
+      }
+      return true;
+    },
+    { message: '同一 actor 的 keyframes 时间必须单调非递减' },
   );
 
 // ─── Camera ───────────────────────────────────────────
@@ -173,6 +200,20 @@ export const SceneJSONSchema = z
           message: `camera.keyframes[${i}].t(${kf.t}) 不能超过 duration(${json.duration})`,
         });
       }
+    });
+
+    // 跨字段：所有 actor.keyframes 的 t 必须 <= duration
+    json.actors.forEach((actor, ai) => {
+      if (!actor.keyframes) return;
+      actor.keyframes.forEach((kf, ki) => {
+        if (kf.t > json.duration) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['actors', ai, 'keyframes', ki, 't'],
+            message: `actors[${ai}].keyframes[${ki}].t(${kf.t}) 不能超过 duration(${json.duration})`,
+          });
+        }
+      });
     });
   });
 

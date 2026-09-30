@@ -1,17 +1,19 @@
 /**
  * ActorMesh · 象形简易人体
  * - 颜色区分身份（脚底色环），无头顶文字
- * - 走位：moves 插值平移 + 程序化步态（腿/臂正弦摆动）
+ * - 走位：keyframes 优先(maya 风格 3 轴手柄) · fallback moves · 最后静态
  * - walk / run 振幅与频率不同；sit / crouch 为静态矮姿
+ * - scale 各轴独立应用（Maya R 手柄）
+ * - facing 用 yaw 角最短路径 slerp（避免绕远路）
  */
 
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Group } from 'three';
-import { useSceneStore, type Vec3 } from '../store/scene';
+import { useSceneStore, type Vec3, type Actor, type ActorKeyframe } from '../store/scene';
 
 interface Props {
-  actor: import('../store/scene').Actor;
+  actor: Actor;
   selected: boolean;
   onClick: () => void;
 }
@@ -25,14 +27,41 @@ function lerp3(a: Vec3, b: Vec3, t: number): Vec3 {
   ];
 }
 
+function lerp3Scale(a: Vec3, b: Vec3, t: number): Vec3 {
+  const u = Math.max(0, Math.min(1, t));
+  return [
+    a[0] + (b[0] - a[0]) * u,
+    a[1] + (b[1] - a[1]) * u,
+    a[2] + (b[2] - a[2]) * u,
+  ];
+}
+
+/** yaw 角最短路径 slerp（Maya 默认行为 · 避免 180°→0° 绕远路） */
+function slerpYaw(fromYaw: number, toYaw: number, t: number): number {
+  let delta = toYaw - fromYaw;
+  // 把 delta 归到 [-π, π] 区间（走最短路径）
+  while (delta > Math.PI) delta -= 2 * Math.PI;
+  while (delta < -Math.PI) delta += 2 * Math.PI;
+  const u = Math.max(0, Math.min(1, t));
+  return fromYaw + delta * u;
+}
+
 function distXZ(a: Vec3, b: Vec3): number {
   const dx = b[0] - a[0];
   const dz = b[2] - a[2];
   return Math.hypot(dx, dz);
 }
 
+function facingToYaw(facing: Vec3 | undefined): number {
+  if (!facing) return 0;
+  return Math.atan2(facing[0], facing[2]);
+}
+
 type EvalResult = {
   pos: Vec3;
+  /** 当前 yaw 角度（弧度） */
+  yaw: number;
+  scale: Vec3;
   pose: string;
   moving: boolean;
   /** 本段走位朝向（有位移时），否则 null */
@@ -41,14 +70,95 @@ type EvalResult = {
   traveled: number;
 };
 
-function evalActorPos(actor: import('../store/scene').Actor, t: number): EvalResult {
-  const start = actor.start;
-  const moves = Array.isArray(actor.moves) ? [...actor.moves].sort((x, y) => x.t0 - y.t0) : [];
-  if (!moves.length) {
-    return { pos: start, pose: actor.pose, moving: false, moveDir: null, traveled: 0 };
+/**
+ * 评估 actor 在时刻 t 的渲染状态
+ *
+ * 优先级：
+ * 1. actor.keyframes 存在 → 按时间排序的关键帧插值（pos / facing yaw slerp / scale 各轴）
+ * 2. actor.moves 存在 → 程序化走位（兼容旧场景）
+ * 3. fallback 静态（actor.start / actor.facing / actor.scale / actor.pose）
+ */
+function evalActor(actor: Actor, t: number): EvalResult {
+  const defaultScale: Vec3 = actor.scale ?? [1, 1, 1];
+  const defaultYaw = facingToYaw(actor.facing);
+
+  // 1. 优先 keyframes
+  const kfs: ActorKeyframe[] = Array.isArray(actor.keyframes)
+    ? [...actor.keyframes].sort((a, b) => a.t - b.t)
+    : [];
+  if (kfs.length >= 1) {
+    if (kfs.length === 1 || t <= kfs[0].t) {
+      const kf = kfs[0];
+      return {
+        pos: kf.pos,
+        yaw: facingToYaw(kf.facing),
+        scale: kf.scale ?? defaultScale,
+        pose: kf.pose ?? actor.pose ?? 'stand',
+        moving: false,
+        moveDir: null,
+        traveled: 0,
+      };
+    }
+    if (t >= kfs[kfs.length - 1].t) {
+      const kf = kfs[kfs.length - 1];
+      return {
+        pos: kf.pos,
+        yaw: facingToYaw(kf.facing),
+        scale: kf.scale ?? defaultScale,
+        pose: kf.pose ?? actor.pose ?? 'stand',
+        moving: false,
+        moveDir: null,
+        traveled: 0,
+      };
+    }
+    // 在 segment 内插值
+    for (let i = 0; i < kfs.length - 1; i++) {
+      const a = kfs[i];
+      const b = kfs[i + 1];
+      if (t >= a.t && t <= b.t) {
+        const span = Math.max(0.001, b.t - a.t);
+        const u = (t - a.t) / span;
+        const pos = lerp3(a.pos, b.pos, u);
+        const yawA = facingToYaw(a.facing);
+        const yawB = facingToYaw(b.facing);
+        const yaw = slerpYaw(yawA, yawB, u);
+        const scaleA = a.scale ?? defaultScale;
+        const scaleB = b.scale ?? defaultScale;
+        const scale = lerp3Scale(scaleA, scaleB, u);
+        const segLen = distXZ(a.pos, b.pos);
+        const moving = segLen > 0.05;
+        const moveDir: Vec3 | null = moving
+          ? [b.pos[0] - a.pos[0], 0, b.pos[2] - a.pos[2]]
+          : null;
+        return {
+          pos,
+          yaw,
+          scale,
+          pose: a.pose ?? actor.pose ?? 'stand',
+          moving,
+          moveDir,
+          traveled: segLen * u,
+        };
+      }
+    }
   }
 
-  let pose = actor.pose;
+  // 2. fallback moves
+  const start: Vec3 = actor.start ?? [0, 0, 0];
+  const moves = Array.isArray(actor.moves) ? [...actor.moves].sort((x, y) => x.t0 - y.t0) : [];
+  if (!moves.length) {
+    return {
+      pos: start,
+      yaw: defaultYaw,
+      scale: defaultScale,
+      pose: actor.pose ?? 'stand',
+      moving: false,
+      moveDir: null,
+      traveled: 0,
+    };
+  }
+
+  let pose = actor.pose ?? 'stand';
   let cursor = start;
   let traveled = 0;
 
@@ -56,7 +166,15 @@ function evalActorPos(actor: import('../store/scene').Actor, t: number): EvalRes
     const to = m.to as Vec3;
     const segLen = distXZ(cursor, to);
     if (t < m.t0) {
-      return { pos: cursor, pose, moving: false, moveDir: null, traveled };
+      return {
+        pos: cursor,
+        yaw: defaultYaw,
+        scale: defaultScale,
+        pose,
+        moving: false,
+        moveDir: null,
+        traveled,
+      };
     }
     if (t >= m.t0 && t <= m.t1) {
       const span = Math.max(0.001, m.t1 - m.t0);
@@ -66,8 +184,12 @@ function evalActorPos(actor: import('../store/scene').Actor, t: number): EvalRes
       const dz = to[2] - cursor[2];
       const moving = segLen > 0.05;
       const moveDir: Vec3 | null = moving ? [dx, 0, dz] : null;
+      // moves 模式：走位时 actor 自动朝移动方向
+      const yaw = moving ? Math.atan2(dx, dz) : defaultYaw;
       return {
         pos,
+        yaw,
+        scale: defaultScale,
         pose: m.pose || pose,
         moving,
         moveDir,
@@ -78,7 +200,15 @@ function evalActorPos(actor: import('../store/scene').Actor, t: number): EvalRes
     cursor = to;
     pose = m.pose || pose;
   }
-  return { pos: cursor, pose, moving: false, moveDir: null, traveled };
+  return {
+    pos: cursor,
+    yaw: defaultYaw,
+    scale: defaultScale,
+    pose,
+    moving: false,
+    moveDir: null,
+    traveled,
+  };
 }
 
 function shadeHex(hex: string, factor: number): string {
@@ -153,16 +283,12 @@ export function ActorMesh({ actor, selected, onClick }: Props) {
   useFrame(() => {
     if (!rootRef.current) return;
     const t = useSceneStore.getState().previewT;
-    const { pos, pose, moving, moveDir, traveled } = evalActorPos(actor, t);
+    const { pos, yaw, scale, pose, moving, traveled } = evalActor(actor, t);
     rootRef.current.position.set(pos[0], pos[1], pos[2]);
-
-    // 有走位方向时转向移动方向，否则用 facing
-    if (moveDir && (Math.abs(moveDir[0]) + Math.abs(moveDir[2]) > 1e-4)) {
-      rootRef.current.rotation.y = Math.atan2(moveDir[0], moveDir[2]);
-    } else {
-      const facing = actor.facing ?? [0, 0, 1];
-      rootRef.current.rotation.y = Math.atan2(facing[0], facing[2]);
-    }
+    // yaw 已由 evalActor 根据 keyframes/moves/static 决策好
+    rootRef.current.rotation.y = yaw;
+    // scale 各轴独立应用（Maya R 手柄）
+    rootRef.current.scale.set(scale[0], scale[1], scale[2]);
 
     const gp = gaitParams(pose, moving);
 

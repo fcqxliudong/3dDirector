@@ -5,6 +5,7 @@
 import { useSceneStore, type CameraPresetId } from '../store/scene';
 import type {
   Actor,
+  ActorKeyframe,
   ActorMove,
   ActorPose,
   AspectRatio,
@@ -280,6 +281,76 @@ function applyOne(name: string, args: Record<string, unknown>): { ok: boolean; s
       }
       store.removeKeyframe(index);
       return { ok: true, summary: `删除关键帧 #${index}` };
+    }
+    case 'add_actor_keyframe': {
+      const actorId = String(args.actor_id || '');
+      const actor = store.scene.actors.find((a) => a.id === actorId);
+      if (!actor) return { ok: false, summary: '', error: `actor "${actorId}" 不存在` };
+      const t = Number(args.t);
+      if (!Number.isFinite(t) || t < 0) return { ok: false, summary: '', error: 't 非法' };
+      const override: Partial<ActorKeyframe> = {};
+      const pos = asVec3(args.pos);
+      if (pos) override.pos = pos;
+      const facing = asVec3(args.facing);
+      if (facing) override.facing = facing;
+      const scale = asVec3(args.scale);
+      if (scale) override.scale = scale;
+      if (typeof args.pose === 'string' && POSES.has(args.pose)) {
+        override.pose = args.pose as ActorPose;
+      }
+      if (typeof args.ease === 'string' && EASES.has(args.ease)) {
+        override.ease = args.ease as EaseType;
+      }
+      store.addActorKeyframeAtCurrentT(actorId, override);
+      return { ok: true, summary: `actor ${actorId} → 关键帧 @ ${Math.min(store.scene.duration, t).toFixed(2)}s` };
+    }
+    case 'update_actor_keyframe': {
+      const actorId = String(args.actor_id || '');
+      const actor = store.scene.actors.find((a) => a.id === actorId);
+      if (!actor) return { ok: false, summary: '', error: `actor "${actorId}" 不存在` };
+      const index = Number(args.index);
+      if (!Number.isInteger(index) || index < 0 || index >= (actor.keyframes?.length ?? 0)) {
+        return { ok: false, summary: '', error: '关键帧索引非法' };
+      }
+      const patch: Partial<ActorKeyframe> = {};
+      if (typeof args.t === 'number') patch.t = Math.max(0, Math.min(store.scene.duration, args.t));
+      const pos = asVec3(args.pos);
+      if (pos) patch.pos = pos;
+      const facing = asVec3(args.facing);
+      if (facing) patch.facing = facing;
+      const scale = asVec3(args.scale);
+      if (scale) patch.scale = scale;
+      if (typeof args.pose === 'string' && POSES.has(args.pose)) {
+        patch.pose = args.pose as ActorPose;
+      }
+      if (typeof args.ease === 'string' && EASES.has(args.ease)) {
+        patch.ease = args.ease as EaseType;
+      }
+      store.updateActorKeyframe(actorId, index, patch);
+      return { ok: true, summary: `actor ${actorId} 关键帧 #${index} 已更新` };
+    }
+    case 'remove_actor_keyframe': {
+      const actorId = String(args.actor_id || '');
+      const actor = store.scene.actors.find((a) => a.id === actorId);
+      if (!actor) return { ok: false, summary: '', error: `actor "${actorId}" 不存在` };
+      const index = Number(args.index);
+      if (!Number.isInteger(index) || index < 0) {
+        return { ok: false, summary: '', error: '索引非法' };
+      }
+      if ((actor.keyframes?.length ?? 0) <= 1) {
+        return { ok: false, summary: '', error: '至少保留 1 个关键帧' };
+      }
+      store.removeActorKeyframe(actorId, index);
+      return { ok: true, summary: `删除 actor ${actorId} 关键帧 #${index}` };
+    }
+    case 'set_actor_scale': {
+      const actorId = String(args.actor_id || '');
+      const actor = store.scene.actors.find((a) => a.id === actorId);
+      if (!actor) return { ok: false, summary: '', error: `actor "${actorId}" 不存在` };
+      const scale = asVec3(args.scale);
+      if (!scale) return { ok: false, summary: '', error: 'scale 非法' };
+      store.updateActor(actorId, { scale });
+      return { ok: true, summary: `${actorId} scale → [${scale.map((n) => n.toFixed(2)).join(', ')}]` };
     }
     case 'apply_camera_preset': {
       const preset = String(args.preset || '');

@@ -7,11 +7,15 @@
 import { ZodError } from 'zod';
 import { SceneJSONSchema } from './schema.js';
 import type { SceneJSON } from './types.js';
+import type { SceneJSONOutput } from './schema.js';
 
 /**
  * 严格校验 · 失败抛 ZodError
+ *
+ * 返回 zod 推断的 output 类型（optional 字段为 `T | undefined`），
+ * 与 types.ts 的 input 类型 SceneJSON 略有差异但结构兼容。
  */
-export function parseScene(input: unknown): SceneJSON {
+export function parseScene(input: unknown): SceneJSONOutput {
   return SceneJSONSchema.parse(input);
 }
 
@@ -19,7 +23,7 @@ export function parseScene(input: unknown): SceneJSON {
  * 安全校验 · 失败不抛
  */
 export function safeParseScene(input: unknown):
-  | { ok: true; data: SceneJSON }
+  | { ok: true; data: SceneJSONOutput }
   | { ok: false; error: ZodError } {
   const result = SceneJSONSchema.safeParse(input);
   if (result.success) {
@@ -27,6 +31,9 @@ export function safeParseScene(input: unknown):
   }
   return { ok: false, error: result.error };
 }
+
+/** 兼容老调用方 · 仍可用 SceneJSON 类型（input 类型）做赋值 */
+export type { SceneJSON };
 
 /**
  * 稳定序列化（key 排序）· 用于 hash / diff

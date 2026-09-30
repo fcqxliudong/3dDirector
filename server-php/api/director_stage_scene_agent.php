@@ -40,20 +40,26 @@ if (!is_array($body)) {
     return;
 }
 
+$action   = (string)($body['action'] ?? 'chat');
 $prompt   = (string)($body['prompt'] ?? '');
 $provider = (string)($body['provider'] ?? 'cloudflare');
+$modelId  = (string)($body['model_id'] ?? '');
 
-if (trim($prompt) === '') {
-    json_response(['ok' => false, 'error' => 'prompt 不能为空'], 400);
-    return;
+if ($action === 'build_from_node') {
+    $pack  = is_array($body['pack'] ?? null) ? $body['pack'] : [];
+    $scene = is_array($body['scene'] ?? null) ? $body['scene'] : [];
+    $r = ds_agent_build_from_node($uid, $pack, $scene, $provider, $modelId);
+} else {
+    if (trim($prompt) === '') {
+        json_response(['ok' => false, 'error' => 'prompt 不能为空'], 400);
+        return;
+    }
+    if (mb_strlen($prompt) > 2000) {
+        json_response(['ok' => false, 'error' => 'prompt 太长（> 2000 字符）'], 400);
+        return;
+    }
+    $r = ds_scene_agent_generate($uid, $prompt, $provider);
 }
-
-if (mb_strlen($prompt) > 2000) {
-    json_response(['ok' => false, 'error' => 'prompt 太长（> 2000 字符）'], 400);
-    return;
-}
-
-$r = ds_scene_agent_generate($uid, $prompt, $provider);
 
 // 审计日志
 error_log(sprintf(

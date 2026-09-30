@@ -517,12 +517,14 @@ export function Timeline() {
           display: flex;
           flex-direction: column;
           gap: 6px;
-          /* 关键: grid item 默认 min-width: auto = min-content,
-             track-rail zoom 后会撑大整个 grid · 必须显式 min-width: 0 */
+          /* grid item 默认 min-width/min-height: auto = min-content,
+             track-rail zoom 后会撑大整个 grid · 必须显式 min-width/min-height: 0 */
           min-width: 0;
-          overflow: hidden;
+          min-height: 0;
           /* 自适应高度(Actor 多了自动撑高)+ 上限防止挤掉 Canvas */
           max-height: 60vh;
+          /* overflow: shorthand 一行设完,x 隐藏 + y 自动滚动 · 防止 chrome 出现双滚动条 */
+          overflow-x: hidden;
           overflow-y: auto;
         }
         .timeline-controls {
@@ -571,13 +573,13 @@ export function Timeline() {
           border-color: var(--primary);
           box-shadow: 0 0 0 2px var(--primary-soft);
         }
-        .timeline-track { padding: 0; min-width: 0; }
+        .timeline-track { padding: 0; min-width: 0; min-height: 0; }
         .track-wrap {
           position: relative;
           width: 100%;
           min-width: 0;
-          height: 52px;
-          /* 左右各 14px buffer · 让最左/最右关键帧圆点不被 wrap 边缘裁一半 */
+          /* height 由内层 track-rail 决定(40 + N_actors * 24) · 不写死
+             · 旧版 height:52px 会裁掉 actor 轨道行 */
           padding-left: 14px;
           padding-right: 14px;
           padding-bottom: 12px; /* 让出横向滚动条空间 · 避免遮挡 tick 标签/playhead knob */
